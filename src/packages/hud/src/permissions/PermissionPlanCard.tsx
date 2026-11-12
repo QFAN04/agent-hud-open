@@ -18,12 +18,14 @@ export function PermissionPlanCard({
   disabled,
   light = false,
   zh = false,
+  platform,
   answer,
 }: {
   request: Approval;
   disabled: boolean;
   light?: boolean;
   zh?: boolean;
+  platform?: string;
   answer: (decision: RequestDecision) => void | Promise<void>;
 }) {
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -66,9 +68,11 @@ export function PermissionPlanCard({
       {(request.plan || request.detail || request.input) && (
         <div
           aria-label={t("Plan", "计划")}
+          className={platform === "windows" ? "hud-windows-scroll" : undefined}
           style={{
             maxHeight: 150,
             overflowY: "auto",
+            scrollbarWidth: platform === "windows" ? "none" : undefined,
             padding: 9,
             borderRadius: 7,
             background: inset,

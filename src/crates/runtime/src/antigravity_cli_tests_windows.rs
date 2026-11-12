@@ -58,6 +58,7 @@ fn antigravity_cli_is_supported_on_windows_and_requires_delegated_fixed_owner() 
         available["defaultSettings"],
         json!(temp
             .path()
-            .join("home/.gemini/antigravity-cli/settings.json"))
+            .join("home")
+            .join(".gemini/antigravity-cli/settings.json"))
     );
 }

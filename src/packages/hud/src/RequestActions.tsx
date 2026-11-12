@@ -14,6 +14,7 @@ export interface RequestActionsProps {
   onOpenSettings?: (page: string) => void;
   light?: boolean;
   language?: string;
+  platform?: string;
 }
 
 /**
@@ -26,6 +27,7 @@ export function RequestActions({
   onOpenSettings,
   light = false,
   language,
+  platform,
 }: RequestActionsProps) {
   const zh = language?.startsWith("zh") ?? false;
   const t = (en: string, cn: string) => (zh ? cn : en);
@@ -75,6 +77,7 @@ export function RequestActions({
           disabled={disabled}
           light={light}
           zh={zh}
+          platform={platform}
           answer={answer}
         />
       ) : (

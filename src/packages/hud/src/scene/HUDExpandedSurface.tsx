@@ -13,6 +13,7 @@ export function HUDExpandedSurface({
   detached,
   peek,
   simplePeek,
+  bordered,
   open,
   reduceMotion,
   dragging,
@@ -35,6 +36,7 @@ export function HUDExpandedSurface({
   cardVisible: boolean;
   detached: boolean;
   simplePeek: boolean;
+  bordered: boolean;
   dragging: boolean;
   strip: HUDRect;
   flared: boolean;
@@ -183,10 +185,7 @@ export function HUDExpandedSurface({
               background:
                 detached || config.mode === "simple" ? fill : "transparent",
               // The Simple line is the panel growing: no outline of its own.
-              border:
-                (detached || config.mode === "simple") && !simplePeek
-                  ? `1px solid ${outline}`
-                  : "none",
+              border: bordered ? `1px solid ${outline}` : "none",
               boxShadow: config.mode === "notch" ? undefined : shadow,
             }}
           >

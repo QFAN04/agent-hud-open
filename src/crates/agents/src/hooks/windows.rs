@@ -499,7 +499,7 @@ mod tests {
         assert_eq!(
             patch_configuration_for_windows("goose", "--completion-hook", &goose_old, None)
                 .unwrap(),
-            json!({})
+            json!({"hooks": {}})
         );
     }
 }

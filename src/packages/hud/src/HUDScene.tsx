@@ -283,6 +283,8 @@ export function HUDScene({
     peek,
     scale,
     simplePeek,
+    bordered,
+    maxBodyHeight,
     peekTuck,
     targetSize,
     surfaceFlare,
@@ -486,6 +488,7 @@ export function HUDScene({
             fontFamily:
               '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
             color: light ? "#1c1c1e" : "#f2f2f7",
+            colorScheme: light ? "light" : "dark",
             cursor: dragVisual ? "grabbing" : undefined,
           }}
           onFocusCapture={checkDomTyping}
@@ -524,6 +527,7 @@ export function HUDScene({
             detached={detached}
             peek={peek}
             simplePeek={simplePeek}
+            bordered={bordered}
             open={open}
             reduceMotion={reduceMotion}
             dragging={dragging}
@@ -555,13 +559,7 @@ export function HUDScene({
             surfacePadding={surfacePadding}
             inUsagePanel={inUsagePanel}
           >
-            {panelBody(
-              snapshot,
-              Math.max(
-                40,
-                frame.height - surfacePadding.top - surfacePadding.bottom,
-              ),
-            )}
+            {panelBody(snapshot, maxBodyHeight)}
           </HUDExpandedSurface>
           <RestingStrip
             strip={strip}

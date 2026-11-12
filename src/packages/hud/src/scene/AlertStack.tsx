@@ -77,6 +77,7 @@ export function AlertStack({
           backToSession={backToSession}
           light={light}
           language={snapshotLanguage(snapshot)}
+          platform={snapshot.connection.platform}
         />
       ) : event ? (
         <NewsContent
