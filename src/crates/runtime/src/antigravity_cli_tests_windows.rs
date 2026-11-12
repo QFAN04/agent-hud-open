@@ -6,11 +6,11 @@ fn antigravity_cli_is_supported_on_windows_and_requires_delegated_fixed_owner() 
     let mut runtime = isolated(temp.path());
     let before = status(&mut runtime);
     assert_eq!(before["installable"], false);
-    assert_eq!(
-        before["defaultSettings"],
-        json!(temp
-            .path()
-            .join("home/.gemini/antigravity-cli/settings.json"))
+    assert!(
+        Path::new(before["defaultSettings"].as_str().unwrap())
+            .ends_with(Path::new(".gemini/antigravity-cli/settings.json")),
+        "unexpected defaultSettings: {}",
+        before["defaultSettings"]
     );
     let notice = before["notice"].as_str().unwrap();
     assert!(
@@ -49,4 +49,15 @@ fn antigravity_cli_is_supported_on_windows_and_requires_delegated_fixed_owner() 
     assert!(!err.is_empty());
     assert!(set_paths(&mut runtime, json!([path])).is_err());
     assert_eq!(fs::read(&path).unwrap(), original);
+
+    let owner = non_temp_owner_dir();
+    delegate_with_executable(&runtime, temp.path(), owner.path());
+    let available = status(&mut runtime);
+    assert_eq!(available["installable"], true);
+    assert_eq!(
+        available["defaultSettings"],
+        json!(temp
+            .path()
+            .join("home/.gemini/antigravity-cli/settings.json"))
+    );
 }

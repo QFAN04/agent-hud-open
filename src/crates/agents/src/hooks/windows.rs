@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(
             patch_configuration_for_windows("copilot", "--completion-hook", &copilot_added, None)
                 .unwrap(),
-            json!({})
+            json!({"hooks": {}, "version": 1})
         );
 
         // Layout::Text and unsupported Goose refuse install, permit removal

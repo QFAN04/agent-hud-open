@@ -95,6 +95,8 @@ pub(super) fn command(
     );
     let mut script = format!(
         "$ProgressPreference='SilentlyContinue'\n\
+         [Console]::InputEncoding=[System.Text.UTF8Encoding]::new($false)\n\
+         [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)\n\
          $in=[System.Console]::OpenStandardInput()\n\
          $buf=[System.IO.MemoryStream]::new()\n\
          $in.CopyTo($buf)\n\
