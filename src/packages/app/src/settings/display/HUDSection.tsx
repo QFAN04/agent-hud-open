@@ -153,6 +153,14 @@ export function HUDSection({
               "悬停标志只展开该智能体。",
             ),
           )}
+          {toggle(
+            "autoHideAtEdge",
+            t("Auto-hide at edge", "贴边自动收起"),
+            t(
+              "Hide into a thin edge tab when idle; hover the edge to expand.",
+              "空闲时收起为屏幕边缘细条，鼠标悬停边缘自动滑出。",
+            ),
+          )}
         </>
       )}
       <Row
