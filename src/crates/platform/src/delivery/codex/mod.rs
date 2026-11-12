@@ -94,13 +94,47 @@ pub fn thread_open(data: &Path, thread: &str) -> bool {
     }
 }
 /// Whether Codex's desktop app is installed in one of `applications`:
-/// Codex.app, or ChatGPT.app that carries it.
+/// `Codex.app` or `ChatGPT.app` on macOS, or Windows executables and Store
+/// `OpenAI.Codex*` packages under the Windows application roots.
 pub fn desktop_installed(applications: &[std::path::PathBuf]) -> bool {
+    const MAC_BUNDLES: &[&str] = &["Codex.app", "ChatGPT.app"];
+    const WINDOWS_EXES: &[&str] = &[
+        "Codex.exe",
+        "ChatGPT.exe",
+        "chatgpt-desktop.exe",
+        "Codex/Codex.exe",
+        "OpenAI Codex/Codex.exe",
+        "ChatGPT/ChatGPT.exe",
+    ];
     applications.iter().any(|folder| {
-        ["Codex.app", "ChatGPT.app"]
-            .iter()
-            .any(|app| folder.join(app).is_dir())
+        MAC_BUNDLES.iter().any(|app| folder.join(app).is_dir())
+            || WINDOWS_EXES
+                .iter()
+                .any(|exe| is_executable_entry(&folder.join(exe)))
+            || has_codex_store_package(folder)
+            || has_codex_store_package(&folder.join("Packages"))
     })
+}
+
+fn is_executable_entry(path: &Path) -> bool {
+    // App execution aliases under `%LOCALAPPDATA%\Microsoft\WindowsApps` are
+    // reparse points where `is_file()` can fail with access denied; non-dir
+    // symlink metadata covers both regular binaries and WindowsApps aliases.
+    std::fs::symlink_metadata(path).is_ok_and(|meta| !meta.is_dir())
+}
+
+fn has_codex_store_package(root: &Path) -> bool {
+    std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .filter_map(std::result::Result::ok)
+        .any(|entry| {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else {
+                return false;
+            };
+            (name == "OpenAI.Codex" || name.starts_with("OpenAI.Codex_")) && entry.path().is_dir()
+        })
 }
 
 /// Desktop's current-turn selector, including canonical history with empty turns.
@@ -174,4 +208,39 @@ pub fn current_desktop_turn(state: &serde_json::Value) -> Result<Option<(String,
             .flatten()
             .collect(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn desktop_installed_accepts_mac_bundles_windows_exes_and_store_packages() {
+        let temp = tempfile::tempdir().unwrap();
+        let mac = temp.path().join("mac");
+        let programs = temp.path().join("Programs");
+        let windows_apps = temp.path().join("WindowsApps");
+        let local_app = temp.path().join("LocalApp");
+
+        fs::create_dir_all(mac.join("Codex.app")).unwrap();
+        assert!(desktop_installed(std::slice::from_ref(&mac)));
+
+        fs::create_dir_all(programs.join("OpenAI Codex")).unwrap();
+        fs::write(programs.join("OpenAI Codex/Codex.exe"), b"").unwrap();
+        assert!(desktop_installed(std::slice::from_ref(&programs)));
+
+        fs::create_dir_all(windows_apps.join("OpenAI.Codex_2p2nqsd0c76g0")).unwrap();
+        assert!(desktop_installed(std::slice::from_ref(&windows_apps)));
+
+        fs::create_dir_all(local_app.join("Packages/OpenAI.Codex_2p2nqsd0c76g0")).unwrap();
+        assert!(desktop_installed(std::slice::from_ref(&local_app)));
+
+        let chatgpt = temp.path().join("chatgpt");
+        fs::create_dir_all(&chatgpt).unwrap();
+        fs::write(chatgpt.join("ChatGPT.exe"), b"").unwrap();
+        assert!(desktop_installed(std::slice::from_ref(&chatgpt)));
+
+        assert!(!desktop_installed(&[temp.path().join("missing")]));
+    }
 }

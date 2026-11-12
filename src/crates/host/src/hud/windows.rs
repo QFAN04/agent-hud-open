@@ -38,47 +38,92 @@ fn hwnd(window: &tauri::WebviewWindow) -> Result<windows::Win32::Foundation::HWN
     ))
 }
 
-/// Gives the HUD the keyboard for a text field. Windows lets a background
-/// process take the foreground only while attached to the input of the
-/// window in front, so the HUD joins that thread for the switch.
+/// Gives the HUD the keyboard for a text field and hands focus into WebView2.
+/// Runs on the UI thread (via `with_webview`) so `AttachThreadInput`, `SetFocus`,
+/// and `ICoreWebView2Controller::MoveFocus` apply to the HUD's owning thread
+/// even when the HUD already held the foreground (`GetForegroundWindow == target`)
+/// or when `set_focusable(true)`'s async style update has not drained yet.
 pub(super) fn begin_text_focus(
     window: &tauri::WebviewWindow,
 ) -> Result<Option<TextFocusOrigin>, String> {
+    use std::{sync::mpsc, time::Duration};
+    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC;
     use windows::Win32::{
         System::Threading::{AttachThreadInput, GetCurrentThreadId},
         UI::{
             Input::KeyboardAndMouse::SetFocus,
             WindowsAndMessaging::{
-                BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId,
-                SetForegroundWindow,
+                BringWindowToTop, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId,
+                SetForegroundWindow, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, SWP_FRAMECHANGED,
+                SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_NOACTIVATE,
             },
         },
     };
     let target = hwnd(window)?;
-    unsafe {
-        let previous = GetForegroundWindow();
-        let origin = (!previous.is_invalid() && previous != target)
-            .then_some(TextFocusOrigin(previous.0 as isize));
-        let ours = GetCurrentThreadId();
-        let theirs = if previous.is_invalid() {
-            0
-        } else {
-            GetWindowThreadProcessId(previous, None)
-        };
-        let attached =
-            theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, true).as_bool();
-        let _ = BringWindowToTop(target);
-        let _ = SetForegroundWindow(target);
-        let _ = SetFocus(Some(target));
-        if attached {
-            let _ = AttachThreadInput(ours, theirs, false);
-        }
-        if GetForegroundWindow() != target {
-            // The last resort Tauri offers.
-            super::generic::begin_text_focus(window)?;
-        }
-        Ok(origin)
-    }
+    let fallback = window.clone();
+    let (sender, receiver) = mpsc::sync_channel(1);
+    window
+        .with_webview(move |platform| {
+            let result = (|| -> Result<Option<TextFocusOrigin>, String> {
+                unsafe {
+                    let previous = GetForegroundWindow();
+                    let origin = (!previous.is_invalid() && previous != target)
+                        .then_some(TextFocusOrigin(previous.0 as isize));
+                    // Ensure WS_EX_NOACTIVATE is cleared synchronously before SetForegroundWindow
+                    // if set_focusable(true)'s queued Tao window update has not run yet.
+                    let ex_style = GetWindowLongW(target, GWL_EXSTYLE) as u32;
+                    if (ex_style & WS_EX_NOACTIVATE.0) != 0 {
+                        SetWindowLongW(
+                            target,
+                            GWL_EXSTYLE,
+                            (ex_style & !WS_EX_NOACTIVATE.0) as i32,
+                        );
+                        let _ = SetWindowPos(
+                            target,
+                            None,
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_NOMOVE
+                                | SWP_NOSIZE
+                                | SWP_NOZORDER
+                                | SWP_NOACTIVATE
+                                | SWP_FRAMECHANGED,
+                        );
+                    }
+                    let ours = GetCurrentThreadId();
+                    let theirs = if previous.is_invalid() {
+                        0
+                    } else {
+                        GetWindowThreadProcessId(previous, None)
+                    };
+                    let attached = theirs != 0
+                        && theirs != ours
+                        && AttachThreadInput(ours, theirs, true).as_bool();
+                    let _ = BringWindowToTop(target);
+                    let _ = SetForegroundWindow(target);
+                    let _ = SetFocus(Some(target));
+                    if attached {
+                        let _ = AttachThreadInput(ours, theirs, false);
+                    }
+                    if GetForegroundWindow() != target {
+                        // The last resort Tauri offers.
+                        super::generic::begin_text_focus(&fallback)?;
+                    }
+                    platform
+                        .controller()
+                        .MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC)
+                        .map_err(|error| error.to_string())?;
+                    Ok(origin)
+                }
+            })();
+            let _ = sender.send(result);
+        })
+        .map_err(|error| error.to_string())?;
+    receiver
+        .recv_timeout(Duration::from_secs(5))
+        .map_err(|_| "WebView2 did not acquire text focus in time".to_owned())?
 }
 
 /// Returns the keyboard to the window that had it, if it is still there.
@@ -86,21 +131,51 @@ pub(super) fn end_text_focus(
     window: &tauri::WebviewWindow,
     previous: Option<TextFocusOrigin>,
 ) -> Result<(), String> {
+    use std::{sync::mpsc, time::Duration};
     use windows::Win32::UI::WindowsAndMessaging::{
         GetForegroundWindow, IsWindow, SetForegroundWindow,
     };
     let Some(TextFocusOrigin(previous)) = previous else {
         return super::generic::end_text_focus(window, None);
     };
-    let previous = windows::Win32::Foundation::HWND(previous as *mut core::ffi::c_void);
+    let target = hwnd(window)?;
+    let (sender, receiver) = mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let previous = windows::Win32::Foundation::HWND(previous as *mut core::ffi::c_void);
+            unsafe {
+                // Only while the HUD still holds the keyboard: a window the person
+                // has since clicked into keeps it.
+                if GetForegroundWindow() == target && IsWindow(Some(previous)).as_bool() {
+                    let _ = SetForegroundWindow(previous);
+                }
+            }
+            let _ = sender.send(());
+        })
+        .map_err(|error| error.to_string())?;
+    receiver
+        .recv_timeout(Duration::from_secs(5))
+        .map_err(|_| "Windows HUD focus release did not complete in time".to_owned())
+}
+
+/// Whether the HUD still holds Windows keyboard focus while a text lease is
+/// active. `tao`'s `is_focused()` turns false when `WM_KILLFOCUS` fires on the
+/// outer HWND as focus enters WebView2's child window, so check foreground and
+/// ownership against the HUD `HWND` instead.
+pub(super) fn is_text_focus_active(window: &tauri::WebviewWindow) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetAncestor, GetForegroundWindow, IsChild, GA_ROOTOWNER,
+    };
+    let Ok(target) = hwnd(window) else {
+        return window.is_focused().unwrap_or(true);
+    };
     unsafe {
-        // Only while the HUD still holds the keyboard: a window the person
-        // has since clicked into keeps it.
-        if GetForegroundWindow() == hwnd(window)? && IsWindow(Some(previous)).as_bool() {
-            let _ = SetForegroundWindow(previous);
-        }
+        let foreground = GetForegroundWindow();
+        !foreground.is_invalid()
+            && (foreground == target
+                || IsChild(target, foreground).as_bool()
+                || GetAncestor(foreground, GA_ROOTOWNER) == target)
     }
-    Ok(())
 }
 
 fn key_down(virtual_key: i32) -> bool {

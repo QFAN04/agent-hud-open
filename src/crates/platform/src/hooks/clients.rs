@@ -27,7 +27,7 @@ fn flags(source: &str, opted_in: bool) -> Vec<(&'static str, bool)> {
         .collect()
 }
 /// Whether the client's hooks have a way to launch on `os`. Where they have
-/// none (Antigravity's on Windows) its settings are left alone, and that is
+/// none (DeepSeek's or Goose's on Windows) its settings are left alone, and that is
 /// not a failure of the switch: the other clients' hooks still go in.
 fn launches(source: &str, os: agent_hud_agents::Os) -> bool {
     agent_hud_agents::hooks::hooks_by_id(source)
@@ -232,13 +232,76 @@ impl Clients {
 #[cfg(test)]
 mod tests {
     use agent_hud_agents::Os;
+    use std::path::{Path, PathBuf};
+
+    fn non_temp_owner_dir() -> tempfile::TempDir {
+        let temp_root = std::env::temp_dir();
+        let canonical_temp = std::fs::canonicalize(&temp_root).unwrap_or(temp_root);
+        let disallowed = |path: &Path| {
+            let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+            let text = resolved.to_string_lossy().to_lowercase();
+            let temp_text = canonical_temp.to_string_lossy().to_lowercase();
+            let temp_base = temp_text.trim_end_matches('\\');
+            let parts: Vec<String> = resolved
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
+                .collect();
+            resolved.starts_with(&canonical_temp)
+                || (!temp_base.is_empty()
+                    && (text == temp_base || text.starts_with(&format!(r"{temp_base}\"))))
+                || parts
+                    .iter()
+                    .any(|s| matches!(s.as_str(), "temp" | "target" | "windowsapps"))
+                || parts.windows(4).any(|w| {
+                    w[0] == "packages"
+                        && !w[1].is_empty()
+                        && w[2] == "localcache"
+                        && w[3] == "local"
+                })
+        };
+        let env_roots: Vec<PathBuf> = ["LOCALAPPDATA", "USERPROFILE"]
+            .into_iter()
+            .filter_map(std::env::var_os)
+            .map(PathBuf::from)
+            .collect();
+        if !env_roots.is_empty() {
+            for candidate in env_roots
+                .into_iter()
+                .chain(std::iter::once(PathBuf::from(env!("CARGO_MANIFEST_DIR"))))
+            {
+                if candidate.is_dir() && !disallowed(&candidate) {
+                    if let Ok(dir) = tempfile::Builder::new()
+                        .prefix("agent-hud-owner-")
+                        .tempdir_in(&candidate)
+                    {
+                        return dir;
+                    }
+                }
+            }
+        }
+        tempfile::Builder::new()
+            .prefix("agent-hud-owner-")
+            .tempdir()
+            .unwrap()
+    }
 
     #[test]
     fn hooks_go_in_only_where_the_client_can_launch_them() {
-        // Antigravity's hooks run as a POSIX command, which Windows lacks.
-        assert!(!super::launches("antigravity", Os::Windows));
-        assert!(super::launches("antigravity", Os::MacOs));
-        for client in ["claude", "codex"] {
+        // DeepSeek and Goose have no Windows launch contract yet.
+        assert!(!super::launches("deepseek", Os::Windows));
+        assert!(super::launches("deepseek", Os::MacOs));
+        assert!(!super::launches("goose", Os::Windows));
+        for client in [
+            "claude",
+            "codex",
+            "antigravity",
+            "cursor",
+            "qoder",
+            "droid",
+            "zcode",
+            "hermes",
+            "kimi",
+        ] {
             assert!(super::launches(client, Os::Windows), "{client}");
             assert!(super::launches(client, Os::MacOs), "{client}");
         }
@@ -255,7 +318,8 @@ mod tests {
         fs::create_dir_all(home.join(".copilot")).unwrap(); // plain directory
         fs::write(home.join(".copilot/config.json"), "{}").unwrap();
         // A regular file passes the fixed-owner check; it is never launched.
-        let executable = temp.path().join("fixed hook owner");
+        let owner = non_temp_owner_dir();
+        let executable = owner.path().join("fixed hook owner");
         fs::write(&executable, "fixture only").unwrap();
         let mut clients = Clients::default();
         clients
@@ -323,7 +387,8 @@ mod tests {
         let home = temp.path().join("home");
         fs::create_dir_all(home.join(".copilot/hooks")).unwrap(); // plain directory
         fs::write(home.join(".copilot/config.json"), "{}").unwrap();
-        let executable = temp.path().join("fixed hook owner");
+        let owner = non_temp_owner_dir();
+        let executable = owner.path().join("fixed hook owner");
         fs::write(&executable, "fixture only").unwrap();
         let mut clients = Clients::default();
         clients

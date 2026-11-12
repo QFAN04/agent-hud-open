@@ -2,28 +2,28 @@ use super::*;
 
 #[test]
 fn harness_opens_only_its_main_window_when_the_link_is_registered() {
-    for target in [
-        json!({"kind":"deepseek-app"}),
-        json!({"kind":"deepseek-app","id":"session/one?query=two","url":"https://example.com"}),
-    ] {
-        assert_eq!(
-            session_url_on(&target, Os::MacOs, |url| url == "dsh://open"),
-            Some("dsh://open".into())
-        );
-        assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
+    for os in [Os::MacOs, Os::Windows] {
+        for target in [
+            json!({"kind":"deepseek-app"}),
+            json!({"kind":"deepseek-app","id":"session/one?query=two","url":"https://example.com"}),
+        ] {
+            assert_eq!(
+                session_url_on(&target, os, |url| url == "dsh://open"),
+                Some("dsh://open".into())
+            );
+            assert_eq!(session_url_on(&target, os, |_| false), None);
+        }
     }
 }
 
 #[test]
 fn harness_does_not_offer_an_unverified_desktop_link_on_other_hosts() {
-    for os in [Os::Windows, Os::Linux] {
-        assert_eq!(
-            session_url_on(&json!({"kind":"deepseek-app"}), os, |_| {
-                panic!("an unsupported link must not query the host")
-            }),
-            None
-        );
-    }
+    assert_eq!(
+        session_url_on(&json!({"kind":"deepseek-app"}), Os::Linux, |_| {
+            panic!("an unsupported link must not query the host")
+        }),
+        None
+    );
 }
 
 #[test]
@@ -59,22 +59,28 @@ fn claude_project_threads_open_the_exact_project_and_thread() {
         "id": "cmsg_wxyz98765432",
     });
 
-    assert_eq!(
-        session_url_on(&first, Os::MacOs, |_| panic!(
-            "Project thread routes do not use app-link discovery"
-        )),
-        Some("claude://claude.ai/code/project/chan_abcdefgh1234?thread=cmsg_abcdefgh1234".into())
-    );
-    assert_eq!(
-        session_url_on(&second, Os::MacOs, |_| panic!(
-            "Project thread routes do not use app-link discovery"
-        )),
-        Some("claude://claude.ai/code/project/chan_abcdefgh1234?thread=cmsg_wxyz98765432".into())
-    );
+    for os in [Os::MacOs, Os::Windows] {
+        assert_eq!(
+            session_url_on(&first, os, |_| panic!(
+                "Project thread routes do not use app-link discovery"
+            )),
+            Some(
+                "claude://claude.ai/code/project/chan_abcdefgh1234?thread=cmsg_abcdefgh1234".into()
+            )
+        );
+        assert_eq!(
+            session_url_on(&second, os, |_| panic!(
+                "Project thread routes do not use app-link discovery"
+            )),
+            Some(
+                "claude://claude.ai/code/project/chan_abcdefgh1234?thread=cmsg_wxyz98765432".into()
+            )
+        );
+    }
 }
 
 #[test]
-fn claude_project_threads_are_mac_only_and_reject_malformed_ids() {
+fn claude_project_threads_are_mac_and_windows_only_and_reject_malformed_ids() {
     let good_project = "chan_abcdefgh1234";
     let good_thread = "cmsg_abcdefgh1234";
     let target = |project: &str, thread: &str| {
@@ -85,31 +91,31 @@ fn claude_project_threads_are_mac_only_and_reject_malformed_ids() {
         })
     };
 
-    for os in [Os::Windows, Os::Linux] {
-        assert_eq!(
-            session_url_on(&target(good_project, good_thread), os, |_| panic!(
-                "unverified host"
-            )),
-            None
-        );
-    }
+    assert_eq!(
+        session_url_on(&target(good_project, good_thread), Os::Linux, |_| panic!(
+            "unverified host"
+        )),
+        None
+    );
 
-    for (project, thread) in [
-        ("project/other", good_thread),
-        ("chan_short", good_thread),
-        ("chan_abcdefgh1234?x=y", good_thread),
-        (good_project, "local_abcdefgh1234"),
-        (good_project, "cmsg_pending_abcdefgh"),
-        (good_project, "cmsg_abcdefgh1234#fragment"),
-        (good_project, "cmsg_short"),
-    ] {
-        assert_eq!(
-            session_url_on(&target(project, thread), Os::MacOs, |_| panic!(
-                "Project thread routes do not use app-link discovery"
-            )),
-            None,
-            "{project} / {thread}"
-        );
+    for os in [Os::MacOs, Os::Windows] {
+        for (project, thread) in [
+            ("project/other", good_thread),
+            ("chan_short", good_thread),
+            ("chan_abcdefgh1234?x=y", good_thread),
+            (good_project, "local_abcdefgh1234"),
+            (good_project, "cmsg_pending_abcdefgh"),
+            (good_project, "cmsg_abcdefgh1234#fragment"),
+            (good_project, "cmsg_short"),
+        ] {
+            assert_eq!(
+                session_url_on(&target(project, thread), os, |_| panic!(
+                    "Project thread routes do not use app-link discovery"
+                )),
+                None,
+                "{project} / {thread}"
+            );
+        }
     }
 }
 
@@ -143,6 +149,43 @@ fn cursor_local_session_opens_its_folder() {
         session_url(&target).as_deref(),
         Some("cursor://file/Users/a/my%20proj")
     );
+    assert_eq!(
+        session_url(
+            &json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":r"C:\Users\a\my proj"})
+        )
+        .as_deref(),
+        Some("cursor://file/C:/Users/a/my%20proj")
+    );
+    assert_eq!(
+        session_url(&json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":"d:/work/proj"}))
+            .as_deref(),
+        Some("cursor://file/d:/work/proj")
+    );
+    assert_eq!(
+        session_url(
+            &json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":r"\\server\share\my proj"})
+        )
+        .as_deref(),
+        Some("cursor://file//server/share/my%20proj")
+    );
+    assert_eq!(
+        session_url(
+            &json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":r"\\?\C:\Users\a\my proj"})
+        )
+        .as_deref(),
+        Some("cursor://file/C:/Users/a/my%20proj")
+    );
+    assert_eq!(
+        session_url(&json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":r"\\?\UNC\server\share\my proj"})).as_deref(),
+        Some("cursor://file//server/share/my%20proj")
+    );
+    for invalid in ["C:", "C:relative", r"1:\bad", r"\\"] {
+        assert_eq!(
+            session_url(&json!({"kind":"cursor-agent","id":"x","cwd":invalid})),
+            None,
+            "{invalid}"
+        );
+    }
     assert!(session_url(&json!({"kind":"cursor-agent","id":"x","cwd":null})).is_none());
 }
 
@@ -153,10 +196,31 @@ fn a_local_cursor_session_names_its_folder_to_open_in_cursor() {
         cursor_folder(&local).and_then(|folder| folder.to_str()),
         Some("/Users/a/my proj")
     );
+    let win_drive =
+        json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":r" C:\Users\a\my proj "});
+    assert_eq!(
+        cursor_folder(&win_drive).and_then(|folder| folder.to_str()),
+        Some(r"C:\Users\a\my proj")
+    );
+    let win_forward = json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":" d:/work/proj "});
+    assert_eq!(
+        cursor_folder(&win_forward).and_then(|folder| folder.to_str()),
+        Some("d:/work/proj")
+    );
+    let win_unc =
+        json!({"kind":"cursor-agent","id":"3e8f2eb2-c0d0","cwd":r" \\server\share\proj "});
+    assert_eq!(
+        cursor_folder(&win_unc).and_then(|folder| folder.to_str()),
+        Some(r"\\server\share\proj")
+    );
     // A cloud agent opens by its link, and a relative or missing folder is no folder.
     for target in [
         json!({"kind":"cursor-agent","id":"bc-1234","cwd":"/Users/a/p"}),
         json!({"kind":"cursor-agent","id":"3e8f","cwd":"relative"}),
+        json!({"kind":"cursor-agent","id":"3e8f","cwd":"C:"}),
+        json!({"kind":"cursor-agent","id":"3e8f","cwd":"C:relative"}),
+        json!({"kind":"cursor-agent","id":"3e8f","cwd":r"1:\bad"}),
+        json!({"kind":"cursor-agent","id":"3e8f","cwd":r"\\"}),
         json!({"kind":"cursor-agent","id":"3e8f","cwd":null}),
         json!({"kind":"grok-bot-agent","id":"3e8f","cwd":"/Users/a/p"}),
     ] {
@@ -167,15 +231,15 @@ fn a_local_cursor_session_names_its_folder_to_open_in_cursor() {
 #[test]
 fn cursor_app_link_is_offered_only_where_it_is_registered() {
     let target = json!({"kind":"cursor-app"});
-    assert_eq!(
-        session_url_on(&target, Os::MacOs, |url| url == "cursor://"),
-        Some("cursor://".into())
-    );
-    assert_eq!(session_url_on(&target, Os::MacOs, |_| false), None);
-    for os in [Os::Windows, Os::Linux] {
+    for os in [Os::MacOs, Os::Windows] {
         assert_eq!(
-            session_url_on(&target, os, |_| panic!("unverified link")),
-            None
+            session_url_on(&target, os, |url| url == "cursor://"),
+            Some("cursor://".into())
         );
+        assert_eq!(session_url_on(&target, os, |_| false), None);
     }
+    assert_eq!(
+        session_url_on(&target, Os::Linux, |_| panic!("unverified link")),
+        None
+    );
 }

@@ -1,5 +1,9 @@
 use super::*;
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[cfg(unix)]
 #[path = "antigravity_cli_tests_unix.rs"]
@@ -13,10 +17,62 @@ fn isolated(root: &Path) -> Runtime {
     Runtime::with_sources(Vec::new(), root.join("app-data")).unwrap()
 }
 
+fn non_temp_owner_dir() -> tempfile::TempDir {
+    let temp_root = std::env::temp_dir();
+    let canonical_temp = std::fs::canonicalize(&temp_root).unwrap_or(temp_root);
+    let disallowed = |path: &Path| {
+        let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let text = resolved.to_string_lossy().to_lowercase();
+        let temp_text = canonical_temp.to_string_lossy().to_lowercase();
+        let temp_base = temp_text.trim_end_matches('\\');
+        let parts: Vec<String> = resolved
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
+            .collect();
+        resolved.starts_with(&canonical_temp)
+            || (!temp_base.is_empty()
+                && (text == temp_base || text.starts_with(&format!(r"{temp_base}\"))))
+            || parts
+                .iter()
+                .any(|s| matches!(s.as_str(), "temp" | "target" | "windowsapps"))
+            || parts.windows(4).any(|w| {
+                w[0] == "packages" && !w[1].is_empty() && w[2] == "localcache" && w[3] == "local"
+            })
+    };
+    let env_roots: Vec<PathBuf> = ["LOCALAPPDATA", "USERPROFILE"]
+        .into_iter()
+        .filter_map(std::env::var_os)
+        .map(PathBuf::from)
+        .collect();
+    if !env_roots.is_empty() {
+        for candidate in env_roots
+            .into_iter()
+            .chain(std::iter::once(PathBuf::from(env!("CARGO_MANIFEST_DIR"))))
+        {
+            if candidate.is_dir() && !disallowed(&candidate) {
+                if let Ok(dir) = tempfile::Builder::new()
+                    .prefix("agent-hud-owner-")
+                    .tempdir_in(&candidate)
+                {
+                    return dir;
+                }
+            }
+        }
+    }
+    tempfile::Builder::new()
+        .prefix("agent-hud-owner-")
+        .tempdir()
+        .unwrap()
+}
+
 fn delegate(runtime: &Runtime, root: &Path) {
+    delegate_with_executable(runtime, root, root);
+}
+
+fn delegate_with_executable(runtime: &Runtime, root: &Path, executable_root: &Path) {
     // A regular fixture file satisfies the fixed-owner identity check. It is
     // deliberately never launched; this tests installation and persistence.
-    let executable = root.join("fixed hook owner");
+    let executable = executable_root.join("fixed hook owner");
     fs::write(&executable, b"fixture only; never execute").unwrap();
     runtime
         .hooks_handle()
@@ -60,7 +116,8 @@ fn antigravity_cli_rejects_invalid_lists_and_missing_owners_without_file_changes
     assert!(set_paths(&mut runtime, json!([path])).is_err());
     assert!(!path.exists());
 
-    delegate(&runtime, temp.path());
+    let owner = non_temp_owner_dir();
+    delegate_with_executable(&runtime, temp.path(), owner.path());
     for invalid in [
         json!(null),
         json!("settings.json"),

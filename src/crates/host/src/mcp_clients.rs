@@ -2,17 +2,30 @@
 //! Agent HUD's MCP server, added with the client's own command where it has
 //! one and in its settings file where it does not, and the skill that
 //! teaches the agent to use it. At launch, the skill of every client that
-//! has the server is brought up to date.
+//! has the server is brought up to date. A marked DeepSeek Harness server and
+//! an unambiguously broken file-managed server follow the fixed installed
+//! executable, so moving or reinstalling the app cannot leave a stale path.
 use crate::client_cli::{executable, run_client};
 use agent_hud_runtime::hud_tools::{Client, Places, SkillState, CLIENTS};
 use serde_json::{json, Value};
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Mutex, PoisonError},
     time::Duration,
 };
 use tauri::Manager;
+
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as host;
+
+#[cfg(not(windows))]
+mod unix;
+#[cfg(not(windows))]
+use unix as host;
+
 #[derive(Default)]
 pub struct Clients(Mutex<()>);
 fn client(id: &str) -> Result<Client, String> {
@@ -56,6 +69,19 @@ fn installed(client: Client, places: &Places) -> bool {
             .is_some()
     }
 }
+/// Refresh a server only when Agent HUD can prove that its ownership or
+/// failure is safe to establish. This never adds a server.
+fn repair_server_path(client: Client, places: &Places, executable: &Path) -> Result<bool, String> {
+    match client {
+        Client::DeepSeek if installed(client, places) => {
+            client.set_server(places, Some(executable))
+        }
+        _ if client.missing_known_executable(places, executable) => {
+            client.set_server(places, Some(executable))
+        }
+        _ => Ok(false),
+    }
+}
 /// Whether the client is on this machine: its command line, or for the
 /// clients without one, its folder or app.
 fn available(client: Client, places: &Places) -> bool {
@@ -92,7 +118,9 @@ fn status(app: &tauri::AppHandle) -> Result<Value, String> {
     let options = app.state::<super::HostOptions>();
     let path = options.canonical_executable.as_ref();
     let running = std::env::current_exe().ok();
-    let installed_copy = path.is_some_and(|path| running.as_ref() == Some(path));
+    let installed_copy = path
+        .zip(running.as_deref())
+        .is_some_and(|(path, running)| host::same_executable(running, path));
     let complete = super::cli::resource("agent-hud-mcp").is_some()
         && super::cli::resource("agent-hud-engine").is_some();
     let ready = installed_copy && complete;
@@ -147,7 +175,8 @@ fn run(app: &tauri::AppHandle, id: &str, install: bool) -> Result<Value, String>
         .canonical_executable
         .as_ref()
         .ok_or("No fixed application executable is delegated")?;
-    if std::env::current_exe().map_err(|e| e.to_string())? != *path {
+    let running = std::env::current_exe().map_err(|e| e.to_string())?;
+    if !host::same_executable(&running, path) {
         return Err("MCP setup is only available in the fixed installed app".into());
     }
     if install && super::cli::resource("agent-hud-mcp").is_none() {
@@ -187,8 +216,9 @@ fn run(app: &tauri::AppHandle, id: &str, install: bool) -> Result<Value, String>
     status(app)
 }
 /// At launch: brings the skill up to date in every client that lists Agent
-/// HUD's server, adding it where an older version added only the server.
-/// Never adds a server, and only logs a failure.
+/// HUD's server, adding it where an older version added only the server. A
+/// safely identifiable existing server also follows the fixed installed
+/// executable after a move or reinstall. Neither action adds a server.
 pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
     // The demo leaves the user's clients alone.
     if app.state::<super::AppState>().demo {
@@ -210,9 +240,12 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
             if !installed(client, &places) {
                 continue;
             }
-            if client.command().is_none() {
-                if let Some(path) = canonical.as_deref() {
-                    let _ = client.set_server(&places, Some(path));
+            if let Some(path) = canonical.as_deref() {
+                if let Err(error) = repair_server_path(client, &places, path) {
+                    eprintln!(
+                        "The Agent HUD MCP path for {} could not be reconciled: {error}",
+                        client.name()
+                    );
                 }
             }
             match client.skill_state(&places) {
@@ -254,4 +287,90 @@ pub async fn native_mcp_clients(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{collections::HashMap, fs};
+
+    fn places(root: &Path) -> Places {
+        Places::new(
+            &root.join("home"),
+            &HashMap::from([(
+                "DSH_HOME".to_owned(),
+                root.join("dsh").to_string_lossy().into_owned(),
+            )]),
+        )
+    }
+
+    #[test]
+    fn repair_replaces_only_an_existing_deepseek_server_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let places = places(temp.path());
+        fs::create_dir_all(&places.deepseek).unwrap();
+        let old = Path::new("C:/Users/me/AppData/Local/Agent HUD/Agent HUD.exe");
+        let current = Path::new("E:/use/Agent HUD/Agent HUD.exe");
+        Client::DeepSeek.set_server(&places, Some(old)).unwrap();
+
+        assert!(repair_server_path(Client::DeepSeek, &places, current).unwrap());
+        let text = fs::read_to_string(places.deepseek.join("cordis.patch.yml")).unwrap();
+        assert!(text.contains("E:/use/Agent HUD/Agent HUD.exe"));
+        assert!(!text.contains("C:/Users/me/AppData/Local/Agent HUD/Agent HUD.exe"));
+        assert!(!repair_server_path(Client::DeepSeek, &places, current).unwrap());
+    }
+
+    #[test]
+    fn repair_never_adds_a_deepseek_server() {
+        let temp = tempfile::tempdir().unwrap();
+        let places = places(temp.path());
+        fs::create_dir_all(&places.deepseek).unwrap();
+
+        assert!(!repair_server_path(
+            Client::DeepSeek,
+            &places,
+            Path::new("E:/use/Agent HUD/Agent HUD.exe"),
+        )
+        .unwrap());
+        assert!(!places.deepseek.join("cordis.patch.yml").exists());
+    }
+
+    #[test]
+    fn repair_updates_only_a_missing_standard_cursor_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let places = places(temp.path());
+        let old = temp.path().join("old/Agent HUD.exe");
+        let current = temp.path().join("current/Agent HUD.exe");
+        Client::Cursor.set_server(&places, Some(&old)).unwrap();
+
+        assert!(repair_server_path(Client::Cursor, &places, &current).unwrap());
+        let text = fs::read_to_string(places.home.join(".cursor/mcp.json")).unwrap();
+        let value: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            value["mcpServers"]["agent-hud"]["command"],
+            current.to_string_lossy().as_ref()
+        );
+
+        fs::create_dir_all(old.parent().unwrap()).unwrap();
+        fs::write(&old, "custom copy").unwrap();
+        Client::Cursor.set_server(&places, Some(&old)).unwrap();
+        assert!(!repair_server_path(Client::Cursor, &places, &current).unwrap());
+    }
+
+    #[test]
+    fn repair_updates_a_missing_standard_antigravity_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let places = places(temp.path());
+        let old = temp.path().join("old/Agent HUD.exe");
+        let current = temp.path().join("current/Agent HUD.exe");
+        Client::Antigravity.set_server(&places, Some(&old)).unwrap();
+
+        assert!(repair_server_path(Client::Antigravity, &places, &current).unwrap());
+        let text = fs::read_to_string(places.home.join(".gemini/config/mcp_config.json")).unwrap();
+        let value: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            value["mcpServers"]["agent-hud"]["command"],
+            current.to_string_lossy().as_ref()
+        );
+    }
 }

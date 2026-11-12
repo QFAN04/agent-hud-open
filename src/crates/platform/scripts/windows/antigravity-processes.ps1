@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $result = @(
-    Get-CimInstance Win32_Process -Filter "Name='language_server.exe' OR Name='agy.exe'" -Property ProcessId,Name,CreationDate |
+    Get-CimInstance Win32_Process -Filter "Name LIKE 'language_server%.exe' OR Name='agy.exe'" -Property ProcessId,Name,CreationDate |
         ForEach-Object {
             $owner = Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue
             if ($owner.ReturnValue -eq 0 -and $owner.Sid -eq $sid) {

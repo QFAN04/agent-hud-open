@@ -3,7 +3,6 @@
 use super::super::ProcessAncestor;
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
     io::Read,
     path::PathBuf,
     process::{Command, Stdio},
@@ -19,6 +18,13 @@ struct Parent {
 const MAX_OUTPUT_BYTES: u64 = 1024 * 1024;
 
 pub(crate) fn parent_processes() -> Vec<ProcessAncestor> {
+    if let Some(native) = super::process_ancestry::parent_processes_native() {
+        return native;
+    }
+    powershell_parent_processes()
+}
+
+fn powershell_parent_processes() -> Vec<ProcessAncestor> {
     #[cfg(test)]
     let started = Instant::now();
     let Some(system) = std::env::var_os("SystemRoot") else {
@@ -167,7 +173,7 @@ fn parents(bytes: &[u8]) -> impl Iterator<Item = Parent> + '_ {
 }
 
 /// Decode the command line using Windows' native quoting rules.
-fn arguments(command: &str) -> Option<Vec<String>> {
+pub(super) fn arguments(command: &str) -> Option<Vec<String>> {
     use windows_sys::Win32::Foundation::LocalFree;
     #[link(name = "shell32")]
     unsafe extern "system" {
@@ -199,33 +205,8 @@ fn arguments(command: &str) -> Option<Vec<String>> {
     Some(result)
 }
 
-/// Another process's environment is not read on Windows. A daemon-served Codex
-/// TUI therefore has no terminal target from a listening port.
-pub(crate) fn codex_cli_on_port(
-    _port: u16,
-    _wanted_env: &[&str],
-) -> Option<(Vec<String>, HashMap<String, String>)> {
-    None
-}
-
-/// Not asked on Windows yet: every process Claude Code's registry names
-/// runs, so a killed one keeps the transcript's half hour. An adapter would
-/// open the pid (`OpenProcess`) and compare `GetProcessTimes`' creation time
-/// with `started`.
-pub(crate) fn process_runs(_pid: i32, _started: Option<i64>) -> bool {
-    true
-}
-
-/// Not read on Windows yet.
-pub(crate) fn process_start(_pid: i32) -> Option<i64> {
-    None
-}
-
-/// Not asked on Windows yet: no process counts as reading a terminal, so a
-/// hook that waits only beside one leaves at once.
-pub(crate) fn terminal_io(_pid: i32) -> bool {
-    false
-}
+pub(crate) use super::process_net::codex_cli_on_port;
+pub(crate) use super::process_win32::{process_runs, process_start, terminal_io};
 
 #[cfg(test)]
 mod tests {

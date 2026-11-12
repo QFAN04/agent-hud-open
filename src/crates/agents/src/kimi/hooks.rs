@@ -44,7 +44,7 @@ pub static HOOKS: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: crate::hooks::POSIX_ONLY,
+    launch: crate::hooks::QUOTED_COMMAND,
 };
 
 /// The main session a payload names, as the Kimi reader names it

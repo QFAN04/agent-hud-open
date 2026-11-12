@@ -373,7 +373,7 @@ impl Pair {
     /// Whether this client has a Windows launch contract, so a Windows
     /// install can succeed and every Windows scenario says something.
     fn windows_capable(&self) -> bool {
-        matches!(self.source.as_str(), "claude" | "codex" | "copilot")
+        !matches!(self.source.as_str(), "deepseek" | "goose")
     }
 }
 
