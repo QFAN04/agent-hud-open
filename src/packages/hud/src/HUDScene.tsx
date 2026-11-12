@@ -286,7 +286,6 @@ export function HUDScene({
     notchGeometry,
     bodyPadding,
     surfacePadding,
-    marginStyle,
     measurementWidth,
   } = useHUDLayout({
     config,
@@ -333,6 +332,7 @@ export function HUDScene({
     },
     strip,
     edge,
+    vendors.length,
   );
 
   const {
@@ -558,12 +558,6 @@ export function HUDScene({
             draggable={Boolean(onDragStart)}
             dragVisual={dragVisual}
             retracted={retracted}
-            edge={edge}
-            vendors={vendors}
-            fill={fill}
-            outline={outline}
-            light={light}
-            reduceMotion={reduceMotion}
             considerDrag={considerDrag}
             suppressDragClick={suppressDragClick}
             nativePointer={nativePointer}
@@ -580,13 +574,14 @@ export function HUDScene({
               config={config}
               edge={edge}
               strip={strip}
+              compactStrip={effectiveStrip}
+              retracted={retracted}
               metrics={metrics}
               vendors={vendors}
               cardVisible={cardVisible}
               light={light}
               fill={fill}
               outline={outline}
-              marginStyle={marginStyle}
               dragVisual={dragVisual}
               hovered={hovered}
               pointerInside={pointerInside}

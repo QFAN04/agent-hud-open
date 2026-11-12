@@ -144,7 +144,17 @@ export function HUDExpandedSurface({
                 moving
                   ? { opacity: 0, transition: { duration: 0 } }
                   : reduceMotion || detached
-                    ? { opacity: 0, scaleX: 0.86, scaleY: 0.86 }
+                    ? {
+                        opacity: 0,
+                        scaleX:
+                          !reduceMotion && simplePeek && !horizontal(edge)
+                            ? 0.2
+                            : 0.86,
+                        scaleY:
+                          !reduceMotion && simplePeek && !horizontal(edge)
+                            ? 1
+                            : 0.86,
+                      }
                     : from,
             }}
             exit="gone"

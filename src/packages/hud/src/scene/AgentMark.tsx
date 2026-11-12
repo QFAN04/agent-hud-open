@@ -16,6 +16,7 @@ import {
 } from "../model";
 import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
+import { COMPACT_MARK_SIZE } from "./edge-retract";
 import type { HUDNativePointer } from "./useHUDInteraction";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
@@ -29,6 +30,7 @@ export function AgentMark({
   edge,
   strip,
   metrics,
+  compact = false,
   light,
   dragVisual,
   hovered,
@@ -52,6 +54,7 @@ export function AgentMark({
   edge: HUDEdge;
   strip: HUDRect;
   metrics: StripMetrics;
+  compact?: boolean;
   light: boolean;
   dragVisual: boolean;
   hovered: string | null;
@@ -73,6 +76,17 @@ export function AgentMark({
   const { quotaDisplay } = format;
   // A ring's figure is text: on a see-through ground, its level's see-through shade.
   const figureColor = useMarkLevelText(light);
+  const transition = reduceMotion
+    ? undefined
+    : "all 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)";
+  const displayMark = compact ? COMPACT_MARK_SIZE : metrics.mark;
+  const displayLogo = compact ? COMPACT_MARK_SIZE : metrics.logo;
+  const showBars = config.mode === "simple" && metrics.bar > 0;
+  const showNumber =
+    config.mode === "simple" &&
+    (config.showsNumbers || config.simpleStyle === "numbers");
+  const showDetail = showBars || showNumber;
+
   return (
     <button
       type="button"
@@ -97,37 +111,55 @@ export function AgentMark({
         background: "transparent",
         display: "flex",
         alignItems: "center",
-        gap: metrics.labelGap,
+        gap: compact || !showDetail ? 0 : metrics.labelGap,
         flexShrink: 0,
         cursor: dragVisual
           ? "grabbing"
           : config.separatesAgents
             ? "pointer"
             : "default",
+        transition,
       }}
     >
       <span
         style={{
-          width: metrics.mark,
-          height: metrics.mark,
+          width: displayMark,
+          height: displayMark,
           display: "inline-grid",
           placeItems: "center",
           position: "relative",
+          flexShrink: 0,
+          transition,
         }}
       >
         {config.mode === "simple" && isRingStyle(config.simpleStyle) && (
-          <MarkRing
-            style={config.simpleStyle}
-            items={markItems(vendor, quotaDisplay, config.panelLayout)}
-            size={metrics.mark}
-            ringWidth={config.ringWidth}
-            light={light}
-            reduceMotion={reduceMotion}
-          />
+          <span
+            aria-hidden={compact || undefined}
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              placeContent: "center",
+              opacity: compact ? 0 : 1,
+              transform: compact ? "scale(0.5)" : "scale(1)",
+              pointerEvents: "none",
+              transition,
+            }}
+          >
+            <MarkRing
+              style={config.simpleStyle}
+              items={markItems(vendor, quotaDisplay, config.panelLayout)}
+              size={metrics.mark}
+              ringWidth={config.ringWidth}
+              light={light}
+              reduceMotion={reduceMotion}
+            />
+          </span>
         )}
         <BotMark
           source={vendor.name}
-          size={metrics.logo}
+          size={displayLogo}
           light={light}
           enabled={config.botLogos}
           hovered={
@@ -210,33 +242,48 @@ export function AgentMark({
           />
         )}
       </span>
-      {config.mode === "simple" && metrics.bar > 0 && (
-        <MarkBars
-          items={markItems(vendor, quotaDisplay, config.panelLayout)}
-          length={metrics.bar}
-          height={metrics.mark}
-          size={clampedSize(config.simpleSize)}
-          ringWidth={config.ringWidth}
-          light={light}
-          reduceMotion={reduceMotion}
-        />
+      {showDetail && (
+        <span
+          aria-hidden={compact || undefined}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: metrics.labelGap,
+            maxWidth: compact ? 0 : 180,
+            opacity: compact ? 0 : 1,
+            overflow: "hidden",
+            flexShrink: 0,
+            transition,
+          }}
+        >
+          {showBars && (
+            <MarkBars
+              items={markItems(vendor, quotaDisplay, config.panelLayout)}
+              length={metrics.bar}
+              height={metrics.mark}
+              size={clampedSize(config.simpleSize)}
+              ringWidth={config.ringWidth}
+              light={light}
+              reduceMotion={reduceMotion}
+            />
+          )}
+          {showNumber && (
+            <span
+              style={{
+                color: figureColor(vendor.level),
+                fontSize: metrics.font,
+                fontWeight: 400,
+                fontVariantNumeric: "tabular-nums",
+                whiteSpace: "nowrap",
+                textAlign: "right",
+                minWidth: horizontal(edge) ? undefined : metrics.label,
+              }}
+            >
+              {meterLabel(vendor, quotaDisplay)}
+            </span>
+          )}
+        </span>
       )}
-      {config.mode === "simple" &&
-        (config.showsNumbers || config.simpleStyle === "numbers") && (
-          <span
-            style={{
-              color: figureColor(vendor.level),
-              fontSize: metrics.font,
-              fontWeight: 400,
-              fontVariantNumeric: "tabular-nums",
-              whiteSpace: "nowrap",
-              textAlign: "right",
-              minWidth: horizontal(edge) ? undefined : metrics.label,
-            }}
-          >
-            {meterLabel(vendor, quotaDisplay)}
-          </span>
-        )}
     </button>
   );
 }

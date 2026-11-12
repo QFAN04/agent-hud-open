@@ -1,29 +1,11 @@
-import {
-  useEffect,
-  useRef,
-  type MutableRefObject,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
+import type {
+  MutableRefObject,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
 } from "react";
-import { motion } from "motion/react";
 import { position, type HUDRect } from "../geometry";
-import type { HUDEdge, HUDVendor } from "../model";
 import type { dragSurfaceGeometry } from "../placement";
-import { EdgeTab } from "./EdgeTab";
 import type { HUDNativePointer } from "./useHUDInteraction";
-
-function edgeSlideInitial(edge: HUDEdge) {
-  switch (edge) {
-    case "left":
-      return { x: -12, y: 0, opacity: 0.55 };
-    case "right":
-      return { x: 12, y: 0, opacity: 0.55 };
-    case "top":
-      return { x: 0, y: -12, opacity: 0.55 };
-    case "bottom":
-      return { x: 0, y: 12, opacity: 0.55 };
-  }
-}
 
 /** The resting strip the marks sit in: it takes the pointer for them, with
  * the surface a drag grabs it by and, while it is dragged, its outline. */
@@ -33,12 +15,6 @@ export function RestingStrip({
   draggable,
   dragVisual,
   retracted = false,
-  edge,
-  vendors,
-  fill,
-  outline,
-  light,
-  reduceMotion,
   considerDrag,
   suppressDragClick,
   nativePointer,
@@ -57,12 +33,6 @@ export function RestingStrip({
   draggable: boolean;
   dragVisual: boolean;
   retracted?: boolean;
-  edge: HUDEdge;
-  vendors: readonly HUDVendor[];
-  fill: string;
-  outline: string;
-  light: boolean;
-  reduceMotion: boolean;
   considerDrag: (event: ReactPointerEvent<HTMLDivElement>) => void;
   suppressDragClick: MutableRefObject<boolean>;
   nativePointer?: HUDNativePointer;
@@ -83,11 +53,6 @@ export function RestingStrip({
   /** The marks. */
   children: ReactNode;
 }) {
-  const wasRetracted = useRef(false);
-  const slideFromRetract = !retracted && wasRetracted.current && !reduceMotion;
-  useEffect(() => {
-    wasRetracted.current = retracted;
-  }, [retracted]);
   const grabBox = retracted
     ? { left: 0, top: 0, width: strip.width, height: strip.height }
     : {
@@ -106,7 +71,6 @@ export function RestingStrip({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          overflow: retracted ? "hidden" : undefined,
           userSelect: "none",
           touchAction: draggable ? "none" : undefined,
           cursor: dragVisual ? "grabbing" : undefined,
@@ -149,32 +113,7 @@ export function RestingStrip({
             }}
           />
         )}
-        {retracted ? (
-          <EdgeTab
-            edge={edge}
-            vendors={vendors}
-            fill={fill}
-            outline={outline}
-            light={light}
-          />
-        ) : slideFromRetract ? (
-          <motion.div
-            initial={edgeSlideInitial(edge)}
-            animate={{ x: 0, y: 0, opacity: 1 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
-            style={{
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {children}
-          </motion.div>
-        ) : (
-          children
-        )}
+        {children}
       </div>
       {dragVisual && (
         <svg

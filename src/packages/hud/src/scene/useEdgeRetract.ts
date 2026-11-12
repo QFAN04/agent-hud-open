@@ -8,12 +8,13 @@ import {
   type EdgeRetractGate,
 } from "./edge-retract";
 
-/** Manages auto-retracting a docked Simple strip into an 8px edge sliver when
- * idle, and waking immediately on hover, alert, open panel, or drag. */
+/** Manages auto-retracting a docked Simple strip into a compact Dynamic-style
+ * edge strip when idle, and waking immediately on hover, alert, open, or drag. */
 export function useEdgeRetract(
   gate: EdgeRetractGate,
   strip: HUDRect,
   edge: HUDEdge,
+  vendorCount: number,
 ) {
   const allowed = canRetractAtEdge(gate);
   const [retracted, setRetracted] = useState(false);
@@ -29,6 +30,8 @@ export function useEdgeRetract(
 
   return {
     retracted,
-    effectiveStrip: retracted ? retractedStripFrame(strip, edge) : strip,
+    effectiveStrip: retracted
+      ? retractedStripFrame(strip, edge, vendorCount)
+      : strip,
   };
 }

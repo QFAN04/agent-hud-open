@@ -1,7 +1,11 @@
 import type { HUDRect } from "../geometry";
 import type { HUDConfig, HUDEdge } from "../model";
 
-export const EDGE_TAB_THICKNESS = 8;
+export const COMPACT_MARK_SIZE = 18;
+export const COMPACT_MARK_GAP = 5;
+export const COMPACT_EDGE_PADDING = 5;
+export const COMPACT_STRIP_THICKNESS =
+  COMPACT_MARK_SIZE + COMPACT_EDGE_PADDING * 2;
 export const EDGE_RETRACT_DELAY_MS = 350;
 
 export interface EdgeRetractGate {
@@ -17,7 +21,7 @@ export interface EdgeRetractGate {
   hasOpenEnd: boolean;
 }
 
-/** Whether a Simple dock is idle and allowed to tuck into a thin edge tab. */
+/** Whether a Simple dock is idle and allowed to tuck into a compact edge strip. */
 export function canRetractAtEdge(gate: EdgeRetractGate): boolean {
   return (
     gate.mode === "simple" &&
@@ -33,19 +37,26 @@ export function canRetractAtEdge(gate: EdgeRetractGate): boolean {
   );
 }
 
-/** Slim edge sliver flush against `edge`, centered along `strip`'s span. */
+/** Compact Dynamic-style strip flush against `edge`, centered along `strip`. */
 export function retractedStripFrame(
   strip: HUDRect,
   edge: HUDEdge,
-  thickness = EDGE_TAB_THICKNESS,
+  vendorCount = 0,
+  thickness = COMPACT_STRIP_THICKNESS,
 ): HUDRect {
   const horiz = edge === "top" || edge === "bottom";
   const longSide = horiz ? strip.width : strip.height;
   const shortSide = horiz ? strip.height : strip.width;
   const thin = Math.max(1, Math.min(thickness, shortSide));
+  const desiredSpan =
+    vendorCount > 0
+      ? COMPACT_EDGE_PADDING * 2 +
+        vendorCount * COMPACT_MARK_SIZE +
+        (vendorCount - 1) * COMPACT_MARK_GAP
+      : 36;
   const span = Math.min(
     longSide,
-    Math.max(Math.min(36, longSide), Math.round(longSide * 0.75)),
+    Math.max(Math.min(thin, longSide), desiredSpan),
   );
   switch (edge) {
     case "left":
