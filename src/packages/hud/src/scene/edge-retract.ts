@@ -1,11 +1,13 @@
-import type { HUDRect } from "../geometry";
+import type { HUDRect, StripMetrics } from "../geometry";
 import type { HUDConfig, HUDEdge } from "../model";
 
-export const COMPACT_MARK_SIZE = 18;
-export const COMPACT_MARK_GAP = 5;
-export const COMPACT_EDGE_PADDING = 5;
-export const COMPACT_STRIP_THICKNESS =
-  COMPACT_MARK_SIZE + COMPACT_EDGE_PADDING * 2;
+export interface CompactStripMetrics {
+  mark: number;
+  gap: number;
+  pad: number;
+  radius: number;
+}
+
 export const EDGE_RETRACT_DELAY_MS = 350;
 
 export interface EdgeRetractGate {
@@ -20,6 +22,27 @@ export interface EdgeRetractGate {
   hasAlert: boolean;
   hasOpenEnd: boolean;
 }
+
+/** Proportional compact strip metrics derived from Simple size & gap settings. */
+export function compactStripMetrics(
+  config: Pick<HUDConfig, "simpleSize">,
+  metrics: Pick<StripMetrics, "gap" | "radius">,
+): CompactStripMetrics {
+  const size = Math.max(20, Math.min(60, config.simpleSize));
+  const mark = Math.round(size * 0.68);
+  const gap = Math.min(
+    metrics.gap,
+    Math.max(4, Math.round(metrics.gap * 0.75)),
+  );
+  const pad = Math.max(5, Math.round(size * 0.2));
+  const radius = Math.min(metrics.radius, Math.round((mark + pad * 2) / 2));
+  return { mark, gap, pad, radius };
+}
+
+const DEFAULT_COMPACT_METRICS = compactStripMetrics(
+  { simpleSize: 26 },
+  { gap: 7, radius: 14 },
+);
 
 /** Whether a Simple dock is idle and allowed to tuck into a compact edge strip. */
 export function canRetractAtEdge(gate: EdgeRetractGate): boolean {
@@ -42,18 +65,19 @@ export function retractedStripFrame(
   strip: HUDRect,
   edge: HUDEdge,
   vendorCount = 0,
-  thickness = COMPACT_STRIP_THICKNESS,
+  compact: CompactStripMetrics = DEFAULT_COMPACT_METRICS,
 ): HUDRect {
   const horiz = edge === "top" || edge === "bottom";
   const longSide = horiz ? strip.width : strip.height;
   const shortSide = horiz ? strip.height : strip.width;
+  const thickness = compact.pad * 2 + compact.mark;
   const thin = Math.max(1, Math.min(thickness, shortSide));
   const desiredSpan =
     vendorCount > 0
-      ? COMPACT_EDGE_PADDING * 2 +
-        vendorCount * COMPACT_MARK_SIZE +
-        (vendorCount - 1) * COMPACT_MARK_GAP
-      : 36;
+      ? compact.pad * 2 +
+        vendorCount * compact.mark +
+        (vendorCount - 1) * compact.gap
+      : thickness + 8;
   const span = Math.min(
     longSide,
     Math.max(Math.min(thin, longSide), desiredSpan),

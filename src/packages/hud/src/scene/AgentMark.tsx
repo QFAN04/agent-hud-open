@@ -16,7 +16,6 @@ import {
 } from "../model";
 import { isRingStyle } from "../usage-meter/arcs";
 import { MarkBars, MarkRing, markItems } from "../usage-meter/mark-usage";
-import { COMPACT_MARK_SIZE } from "./edge-retract";
 import type { HUDNativePointer } from "./useHUDInteraction";
 
 const clampedSize = (size: number) => Math.max(20, Math.min(60, size));
@@ -31,6 +30,7 @@ export function AgentMark({
   strip,
   metrics,
   compact = false,
+  compactSize = 18,
   light,
   dragVisual,
   hovered,
@@ -55,6 +55,7 @@ export function AgentMark({
   strip: HUDRect;
   metrics: StripMetrics;
   compact?: boolean;
+  compactSize?: number;
   light: boolean;
   dragVisual: boolean;
   hovered: string | null;
@@ -79,8 +80,8 @@ export function AgentMark({
   const transition = reduceMotion
     ? undefined
     : "all 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)";
-  const displayMark = compact ? COMPACT_MARK_SIZE : metrics.mark;
-  const displayLogo = compact ? COMPACT_MARK_SIZE : metrics.logo;
+  const displayMark = compact ? compactSize : metrics.mark;
+  const displayLogo = compact ? compactSize : metrics.logo;
   const showBars = config.mode === "simple" && metrics.bar > 0;
   const showNumber =
     config.mode === "simple" &&
@@ -111,6 +112,8 @@ export function AgentMark({
         background: "transparent",
         display: "flex",
         alignItems: "center",
+        height: displayMark,
+        lineHeight: 1,
         gap: compact || !showDetail ? 0 : metrics.labelGap,
         flexShrink: 0,
         cursor: dragVisual
@@ -250,6 +253,8 @@ export function AgentMark({
             alignItems: "center",
             gap: metrics.labelGap,
             maxWidth: compact ? 0 : 180,
+            maxHeight: compact ? 0 : Math.max(metrics.mark, metrics.font * 2),
+            lineHeight: compact ? 0 : undefined,
             opacity: compact ? 0 : 1,
             overflow: "hidden",
             flexShrink: 0,

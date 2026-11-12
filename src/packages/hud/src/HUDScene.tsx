@@ -37,6 +37,7 @@ import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
 import { useSceneAlerts } from "./scene/useSceneAlerts";
+import { compactStripMetrics } from "./scene/edge-retract";
 import { useEdgeRetract } from "./scene/useEdgeRetract";
 import { usePanelCommand } from "./scene/usePanelCommand";
 import { useSceneViewport } from "./scene/useSceneViewport";
@@ -317,6 +318,7 @@ export function HUDScene({
     nativePointer,
     scene,
   });
+  const compactMetrics = compactStripMetrics(config, metrics);
   const { retracted, effectiveStrip } = useEdgeRetract(
     {
       mode: config.mode,
@@ -333,6 +335,7 @@ export function HUDScene({
     strip,
     edge,
     vendors.length,
+    compactMetrics,
   );
 
   const {

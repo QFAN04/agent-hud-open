@@ -9,7 +9,7 @@ import {
   type HUDVendor,
 } from "../model";
 import { Silhouette } from "./NotchSurface";
-import { COMPACT_EDGE_PADDING, COMPACT_MARK_GAP } from "./edge-retract";
+import { compactStripMetrics } from "./edge-retract";
 import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
 import type { HUDNativePointer } from "./useHUDInteraction";
 import { useFormat } from "@agent-hud/ui/format-context";
@@ -75,6 +75,7 @@ export function HUDMarkStrip({
   const format = useFormat();
   const zh = format.language === "zh";
   const horiz = horizontal(edge);
+  const compact = compactStripMetrics(config, metrics);
   const simpleW = metrics.width - (horiz ? 0 : SIMPLE_EDGE_MARGIN);
   const simpleH = metrics.height - (horiz ? SIMPLE_EDGE_MARGIN : 0);
   const compactW = compactStrip?.width ?? simpleW;
@@ -141,18 +142,12 @@ export function HUDMarkStrip({
             marginBottom:
               !retracted && edge === "bottom" ? SIMPLE_EDGE_MARGIN : 0,
             marginLeft: !retracted && edge === "left" ? SIMPLE_EDGE_MARGIN : 0,
-            paddingTop: retracted ? COMPACT_EDGE_PADDING : metrics.padding.top,
-            paddingRight: retracted
-              ? COMPACT_EDGE_PADDING
-              : metrics.padding.right,
-            paddingBottom: retracted
-              ? COMPACT_EDGE_PADDING
-              : metrics.padding.bottom,
-            paddingLeft: retracted
-              ? COMPACT_EDGE_PADDING
-              : metrics.padding.left,
-            gap: retracted ? COMPACT_MARK_GAP : metrics.gap,
-            borderRadius: retracted ? 10 : metrics.radius,
+            paddingTop: retracted ? compact.pad : metrics.padding.top,
+            paddingRight: retracted ? compact.pad : metrics.padding.right,
+            paddingBottom: retracted ? compact.pad : metrics.padding.bottom,
+            paddingLeft: retracted ? compact.pad : metrics.padding.left,
+            gap: `${retracted ? compact.gap : metrics.gap}px`,
+            borderRadius: retracted ? compact.radius : metrics.radius,
             backgroundColor: retracted ? compactFill : fill,
             boxShadow: `inset 0 0 0 1px ${retracted ? compactOutline : outline}`,
           }}
@@ -162,6 +157,7 @@ export function HUDMarkStrip({
           }}
           style={{
             ...anchorStyle,
+            boxSizing: "border-box",
             display: "flex",
             flexDirection: horiz ? "row" : "column",
             alignItems: horiz ? "center" : "flex-start",
@@ -181,6 +177,7 @@ export function HUDMarkStrip({
               strip={strip}
               metrics={metrics}
               compact={retracted}
+              compactSize={compact.mark}
               light={light}
               dragVisual={dragVisual}
               hovered={hovered}

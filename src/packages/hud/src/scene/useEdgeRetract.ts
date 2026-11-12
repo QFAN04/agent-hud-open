@@ -5,6 +5,7 @@ import {
   canRetractAtEdge,
   EDGE_RETRACT_DELAY_MS,
   retractedStripFrame,
+  type CompactStripMetrics,
   type EdgeRetractGate,
 } from "./edge-retract";
 
@@ -15,6 +16,7 @@ export function useEdgeRetract(
   strip: HUDRect,
   edge: HUDEdge,
   vendorCount: number,
+  compact?: CompactStripMetrics,
 ) {
   const allowed = canRetractAtEdge(gate);
   const [retracted, setRetracted] = useState(false);
@@ -31,7 +33,7 @@ export function useEdgeRetract(
   return {
     retracted,
     effectiveStrip: retracted
-      ? retractedStripFrame(strip, edge, vendorCount)
+      ? retractedStripFrame(strip, edge, vendorCount, compact)
       : strip,
   };
 }
