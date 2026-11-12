@@ -21,7 +21,7 @@ fn quote(text: &str) -> String {
 }
 
 fn callback(context: &InstallContext, data: &Path, settings: &Path) -> Result<Callback, String> {
-    let path = |path: &Path| {
+    let path = |path: &Path| -> Result<String, String> {
         let text = path
             .to_str()
             .filter(|text| !text.contains('\0'))

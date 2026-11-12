@@ -347,7 +347,7 @@ fn json_server_path_repair_requires_a_missing_enabled_standard_entry() {
     let temp = tempfile::tempdir().unwrap();
     let old = temp.path().join("old/Agent HUD.exe");
     let current = temp.path().join("current/Agent HUD.exe");
-    let text = json!({
+    let text = serde_json::json!({
         "mcpServers": {
             "agent-hud": { "command": old, "args": ["--mcp"] }
         }
@@ -359,7 +359,7 @@ fn json_server_path_repair_requires_a_missing_enabled_standard_entry() {
     fs::write(&old, "custom copy").unwrap();
     assert!(!mcp_json::missing_known_executable(Some(&text), &current));
 
-    let disabled = json!({
+    let disabled = serde_json::json!({
         "mcpServers": {
             "agent-hud": {
                 "command": current,

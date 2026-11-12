@@ -182,8 +182,8 @@ pub(crate) fn app_cookie(app_data: &Path, app: &str, site: &str, name: &str) -> 
 
 #[cfg(test)]
 mod tests {
+    use super::dpapi_tests::{aes_256_gcm_encrypt, protect_dpapi};
     use super::*;
-    use crate::os::windows::dpapi_tests::{aes_256_gcm_encrypt, protect_dpapi};
     use base64::{engine::general_purpose::STANDARD, Engine};
     use sha2::{Digest, Sha256};
     use tempfile::tempdir;

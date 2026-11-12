@@ -292,7 +292,7 @@ pub async fn native_mcp_clients(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{collections::HashMap, fs};
+    use std::collections::HashMap;
 
     fn places(root: &Path) -> Places {
         Places::new(

@@ -1,5 +1,6 @@
+use super::super::{joined_path, path_entries};
 use super::shims::{resolve_cmd_exe, resolve_scoop_shim};
-use super::{app_support, joined_path, local_app, path_entries, variable, Environment};
+use super::{app_support, local_app, variable, Environment};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},

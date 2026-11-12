@@ -7,6 +7,7 @@ use std::{
 };
 
 #[repr(C)]
+#[allow(dead_code)]
 struct Guid {
     data1: u32,
     data2: u16,

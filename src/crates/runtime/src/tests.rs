@@ -65,6 +65,7 @@ fn non_temp_owner_dir() -> tempfile::TempDir {
         .unwrap()
 }
 
+#[allow(dead_code)] // Used by antigravity_cli_tests_unix.rs.
 fn delegate(runtime: &Runtime, root: &Path) {
     delegate_with_executable(runtime, root, root);
 }
