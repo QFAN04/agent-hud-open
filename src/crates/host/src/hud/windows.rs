@@ -170,7 +170,7 @@ pub(super) fn is_text_focus_active(window: &tauri::WebviewWindow) -> bool {
         GetAncestor, GetForegroundWindow, IsChild, GA_ROOTOWNER,
     };
     let Ok(target) = hwnd(window) else {
-        return window.is_focused().unwrap_or(true);
+        return super::generic::is_text_focus_active(window);
     };
     unsafe {
         let foreground = GetForegroundWindow();

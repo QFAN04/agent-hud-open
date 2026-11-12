@@ -358,7 +358,7 @@ mod tests {
         // Layout::Groups with CommandArgs + alias (QoderWork)
         let qoder_orig = json!({
             "hooks": {
-                "PreToolUse": [{
+                "PermissionRequest": [{
                     "matcher": "*",
                     "hooks": [{"type": "command", "command": r"C:\Old\Agent.exe", "args": ["--permission-hook", "qoderWork"]}]
                 }]
@@ -372,17 +372,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            qoder_added["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
+            qoder_added["hooks"]["PermissionRequest"][0]["hooks"][0]["command"],
             exe
         );
         assert_eq!(
-            qoder_added["hooks"]["PreToolUse"][0]["hooks"][0]["args"],
+            qoder_added["hooks"]["PermissionRequest"][0]["hooks"][0]["args"],
             json!(["--permission-hook", "qoder-work"])
         );
         let qoder_removed =
             patch_configuration_for_windows("qoder-work", "--permission-hook", &qoder_added, None)
                 .unwrap();
-        assert!(qoder_removed["hooks"].get("PreToolUse").is_none());
+        assert!(qoder_removed["hooks"].get("PermissionRequest").is_none());
 
         // Layout::NestedGroups (ZCode)
         let zcode_orig = json!({});
