@@ -59,12 +59,14 @@ pub(super) fn begin_text_focus(
             },
         },
     };
-    let target = hwnd(window)?;
+    let target_hwnd = hwnd(window)?.0 as isize;
     let fallback = window.clone();
     let (sender, receiver) = mpsc::sync_channel(1);
     window
         .with_webview(move |platform| {
             let result = (|| -> Result<Option<TextFocusOrigin>, String> {
+                let target =
+                    windows::Win32::Foundation::HWND(target_hwnd as *mut core::ffi::c_void);
                 unsafe {
                     let previous = GetForegroundWindow();
                     let origin = (!previous.is_invalid() && previous != target)
@@ -138,10 +140,11 @@ pub(super) fn end_text_focus(
     let Some(TextFocusOrigin(previous)) = previous else {
         return super::generic::end_text_focus(window, None);
     };
-    let target = hwnd(window)?;
+    let target_hwnd = hwnd(window)?.0 as isize;
     let (sender, receiver) = mpsc::sync_channel(1);
     window
         .run_on_main_thread(move || {
+            let target = windows::Win32::Foundation::HWND(target_hwnd as *mut core::ffi::c_void);
             let previous = windows::Win32::Foundation::HWND(previous as *mut core::ffi::c_void);
             unsafe {
                 // Only while the HUD still holds the keyboard: a window the person

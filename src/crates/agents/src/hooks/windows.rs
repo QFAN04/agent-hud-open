@@ -50,7 +50,7 @@ pub fn windows_hook_handler(source: &str, flag: &str, executable: &str) -> Resul
     match hooks.launch.windows.value() {
         Some(Launch::QuotedCommand) => {
             let command = quoted_command(source, flag, executable)?;
-            match hooks.layout {
+            match &hooks.layout {
                 Layout::Handlers(handler) if !handler.typed => {
                     Ok(json!({ handler.command_key: command }))
                 }

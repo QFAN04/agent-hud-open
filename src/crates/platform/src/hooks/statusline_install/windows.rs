@@ -57,11 +57,11 @@ fn decode_powershell(command: &str) -> Option<String> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .ok()?;
-    if bytes.len() % 2 != 0 {
+    let chunks = bytes.chunks_exact(2);
+    if !chunks.remainder().is_empty() {
         return None;
     }
-    let words: Vec<u16> = bytes
-        .chunks_exact(2)
+    let words: Vec<u16> = chunks
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect();
     String::from_utf16(&words).ok()
