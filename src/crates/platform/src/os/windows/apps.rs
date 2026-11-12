@@ -9,19 +9,20 @@ use std::{
     mem::{size_of, zeroed},
     path::{Path, PathBuf},
 };
-use windows_sys::Win32::{
-    Foundation::{CloseHandle, BOOL, HWND, INVALID_HANDLE_VALUE, LPARAM},
-    System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
-        TH32CS_SNAPPROCESS,
-    },
-    UI::WindowsAndMessaging::{
-        EnumWindows, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic,
-        IsWindowVisible, SetForegroundWindow, ShowWindow, GW_OWNER, SW_RESTORE,
+use windows_sys::{
+    core::BOOL,
+    Win32::{
+        Foundation::{CloseHandle, HWND, INVALID_HANDLE_VALUE, LPARAM},
+        System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        },
+        UI::WindowsAndMessaging::{
+            EnumWindows, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic,
+            IsWindowVisible, SetForegroundWindow, ShowWindow, GW_OWNER, SW_RESTORE,
+        },
     },
 };
-
-pub(crate) const ACTIVATES_APPS: bool = true;
 
 fn wide_name(buf: &[u16; 260]) -> String {
     let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());

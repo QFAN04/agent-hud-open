@@ -1,4 +1,4 @@
-use super::{joined_path, path_entries, variable, Environment, ProcessInfo};
+use super::{variable, Environment, ProcessInfo};
 mod acl;
 mod antigravity;
 mod app_targets;
@@ -21,7 +21,7 @@ mod process_win32;
 mod secrets;
 mod shims;
 mod shortcut;
-pub(crate) use apps::{activate_app, app_running, launch_app, ACTIVATES_APPS};
+pub(crate) use apps::{activate_app, app_running, launch_app};
 pub(crate) use associations::{
     open_folder_in_app, open_session_url, open_url_in_app, registered_bundle, registered_url,
 };
@@ -143,6 +143,7 @@ pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::path_entries;
     use super::*;
 
     #[test]

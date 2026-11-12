@@ -242,10 +242,9 @@ mod tests {
         fs::write(
             &cb_ps,
             format!(
-                "param($f,$d,$s)\n\
-                 $in=[Console]::In.ReadToEnd()\n\
-                 [IO.File]::WriteAllText('{}',$f)\n\
-                 [IO.File]::WriteAllText('{}',$s)\n\
+                "$in=[Console]::In.ReadToEnd()\n\
+                 [IO.File]::WriteAllText('{}',$args[0])\n\
+                 [IO.File]::WriteAllText('{}',$args[2])\n\
                  [IO.File]::WriteAllText('{}',$in)\n\
                  [Console]::Write('NOISY_CB_STDOUT')\n\
                  [Console]::Error.Write('NOISY_CB_STDERR')\n\
@@ -328,7 +327,7 @@ mod tests {
         let cmd_str = installed["statusLine"]["command"].as_str().unwrap();
         let payload = "{\"email\":\"a@b.c\",\"trailing\":true}\n".as_bytes();
         let mut child = Command::new("cmd.exe")
-            .args(["/d", "/s", "/c", &format!("\"{cmd_str}\"")])
+            .args(["/d", "/s", "/c", cmd_str])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

@@ -1,4 +1,4 @@
-use super::acl::{self, Local};
+use super::acl::Local;
 use std::{ffi::c_void, mem::size_of, path::PathBuf};
 use windows_sys::Win32::{
     Foundation::{

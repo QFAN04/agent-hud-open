@@ -202,13 +202,13 @@ mod tests {
     fn failed_run_or_other_command_is_not_quota() {
         let mut body = usage();
         body["status"] = json!("ERROR");
-        assert_eq!(parse("/u", &body).unwrap_err(), failure());
+        assert_eq!(parse("/u", &body).err(), Some(failure()));
         body["error"] = json!("Region unavailable");
         assert!(parse("/u", &body)
-            .unwrap_err()
-            .contains("Region unavailable"));
+            .err()
+            .is_some_and(|err| err.contains("Region unavailable")));
         body["error"] = json!("   ");
-        assert_eq!(parse("/u", &body).unwrap_err(), failure());
+        assert_eq!(parse("/u", &body).err(), Some(failure()));
         body["status"] = json!("SUCCESS");
         body["command"]["name"] = json!("credits");
         assert!(parse("/u", &body).is_err());

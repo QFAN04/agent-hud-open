@@ -81,7 +81,7 @@ pub(crate) fn queue_created(
     enqueue_stdio(route, data, thread, text, message_id, timeout)
 }
 
-fn interrupt_request_args(thread: &str, expected: Option<&str>) -> Result<(u64, Value)> {
+fn interrupt_request_args(thread: &str, expected: Option<&str>) -> Result<(i64, Value)> {
     if expected.is_some_and(str::is_empty) {
         return Err(Failure::InvalidInput("expectedTurnId".into()));
     }
