@@ -67,7 +67,7 @@ pub static HOOKS: Hooks = Hooks {
     prefixed_sessions: true,
     launch: PerOs {
         macos: Support::Unverified(Launch::Command),
-        windows: Support::Unsupported("no verified Windows hook launch contract"),
+        windows: Support::Unverified(Launch::QuotedCommand),
         linux: Support::Unverified(Launch::Command),
     },
 };

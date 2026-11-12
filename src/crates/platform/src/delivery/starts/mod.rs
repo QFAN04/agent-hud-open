@@ -159,13 +159,38 @@ impl SessionStarts {
         }
     }
     /// Whether the client's desktop app is installed, looked up on disk each
-    /// time: Claude.app for Claude; Codex.app or ChatGPT.app for Codex;
-    /// Antigravity.app or Antigravity IDE.app for Antigravity.
+    /// time: `.app` bundles on macOS or desktop executables / Store packages
+    /// on Windows inside `self.applications`.
     fn desktop(&self, provider: Provider) -> bool {
-        let names: &[&str] = match provider {
-            Provider::Claude => &["Claude.app"],
-            Provider::Codex => &["Codex.app", "ChatGPT.app"],
-            Provider::Antigravity => &["Antigravity.app", "Antigravity IDE.app"],
+        match provider {
+            Provider::Antigravity => antigravity_desktop_installed(&self.applications),
+            Provider::Claude => has_desktop_app(
+                &self.applications,
+                &["Claude.app"],
+                &[
+                    "Claude.exe",
+                    "claude.exe",
+                    "claude-desktop.exe",
+                    "AnthropicClaude/Claude.exe",
+                    "AnthropicClaude/claude.exe",
+                    "Claude/Claude.exe",
+                    "Claude/claude.exe",
+                ],
+                &["Claude_"],
+            ),
+            Provider::Codex => has_desktop_app(
+                &self.applications,
+                &["Codex.app", "ChatGPT.app"],
+                &[
+                    "Codex.exe",
+                    "ChatGPT.exe",
+                    "chatgpt-desktop.exe",
+                    "Codex/Codex.exe",
+                    "OpenAI Codex/Codex.exe",
+                    "ChatGPT/ChatGPT.exe",
+                ],
+                &["OpenAI.Codex_", "OpenAI.ChatGPT"],
+            ),
             Provider::DeepSeek
             | Provider::Cursor
             | Provider::Trae
@@ -174,12 +199,59 @@ impl SessionStarts {
             | Provider::Qoder
             | Provider::Kimi
             | Provider::Pi
-            | Provider::OpenCode => &[],
-        };
-        self.applications
-            .iter()
-            .any(|folder| names.iter().any(|name| folder.join(name).is_dir()))
+            | Provider::OpenCode => false,
+        }
     }
+}
+
+fn has_desktop_app(
+    applications: &[PathBuf],
+    bundles: &[&str],
+    exes: &[&str],
+    store_prefixes: &[&str],
+) -> bool {
+    applications.iter().any(|folder| {
+        bundles.iter().any(|name| folder.join(name).is_dir())
+            || exes
+                .iter()
+                .any(|exe| is_executable_entry(&folder.join(exe)))
+            || (!store_prefixes.is_empty() && has_store_package(folder, store_prefixes))
+    })
+}
+
+fn is_executable_entry(path: &Path) -> bool {
+    // App execution aliases under `%LOCALAPPDATA%\Microsoft\WindowsApps` are
+    // reparse points where `is_file()` can fail; non-dir symlink metadata covers
+    // both regular binaries and WindowsApps aliases.
+    fs::symlink_metadata(path).is_ok_and(|meta| !meta.is_dir())
+}
+
+fn has_store_package(folder: &Path, prefixes: &[&str]) -> bool {
+    has_store_package_in(folder, prefixes)
+        || has_store_package_in(&folder.join("Packages"), prefixes)
+}
+
+fn has_store_package_in(root: &Path, prefixes: &[&str]) -> bool {
+    let Ok(entries) = fs::read_dir(root) else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let lower = name.to_ascii_lowercase();
+        if prefixes
+            .iter()
+            .any(|prefix| lower.starts_with(&prefix.to_ascii_lowercase()))
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// A JSON file under 1 MiB, or null when it is missing, larger or not JSON.
@@ -189,6 +261,70 @@ fn read_json(path: &Path) -> Value {
         .filter(|bytes| bytes.len() < 1024 * 1024)
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or(Value::Null)
+}
+
+#[cfg(test)]
+mod desktop_tests {
+    use super::*;
+
+    fn test_starts(apps: Vec<PathBuf>) -> SessionStarts {
+        let root = apps[0].parent().unwrap().to_path_buf();
+        let home = root.join("home");
+        let receipts = root.join("receipts");
+        fs::create_dir_all(&home).unwrap(); // plain directory
+        let config = StartConfig {
+            home: home.clone(),
+            claude_config: home.join(".claude"),
+            codex_data: home.join(".codex"),
+            claude_executable: None,
+            codex_executable: None,
+            antigravity_executable: None,
+            claude_desktop: false,
+            codex_desktop: false,
+            task_root: home.join("tasks"),
+            environment: BTreeMap::new(),
+        };
+        let mut starts = SessionStarts::new(config, receipts).unwrap();
+        starts.set_application_folders(apps);
+        starts
+    }
+
+    #[test]
+    fn desktop_detects_windows_executables_and_store_packages_alongside_mac_bundles() {
+        let temp = tempfile::tempdir().unwrap();
+        let apps = temp.path().join("Apps");
+        let win_apps = temp.path().join("WindowsApps");
+        fs::create_dir_all(&apps).unwrap(); // plain directory
+        fs::create_dir_all(&win_apps).unwrap(); // plain directory
+
+        let starts = test_starts(vec![apps.clone(), win_apps.clone()]);
+        assert!(!starts.desktop(Provider::Claude));
+        assert!(!starts.desktop(Provider::Codex));
+        assert!(!starts.desktop(Provider::Antigravity));
+
+        fs::create_dir_all(apps.join("AnthropicClaude")).unwrap(); // plain directory
+        fs::write(apps.join("AnthropicClaude/claude.exe"), b"").unwrap();
+        fs::create_dir_all(win_apps.join("OpenAI.Codex_2p2nqsd0c76g0")).unwrap(); // plain directory
+        fs::create_dir_all(apps.join("antigravity")).unwrap(); // plain directory
+        fs::write(apps.join("antigravity/Antigravity.exe"), b"").unwrap();
+
+        assert!(starts.desktop(Provider::Claude));
+        assert!(starts.desktop(Provider::Codex));
+        assert!(starts.desktop(Provider::Antigravity));
+
+        fs::remove_file(apps.join("AnthropicClaude/claude.exe")).unwrap();
+        assert!(!starts.desktop(Provider::Claude));
+        fs::create_dir_all(win_apps.join("Claude_pzs8sxrjxfjjc")).unwrap(); // plain directory
+        assert!(starts.desktop(Provider::Claude));
+
+        // Store packages located under `%LOCALAPPDATA%\Packages` are also found.
+        let local_app = temp.path().join("LocalApp");
+        fs::create_dir_all(local_app.join("Packages/Claude_abc")).unwrap(); // plain directory
+        fs::create_dir_all(local_app.join("Packages/OpenAI.Codex_abc")).unwrap(); // plain directory
+        let pkg_starts = test_starts(vec![local_app]);
+        assert!(pkg_starts.desktop(Provider::Claude));
+        assert!(pkg_starts.desktop(Provider::Codex));
+    }
 }
 
 #[cfg(test)]

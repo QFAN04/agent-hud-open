@@ -1,7 +1,7 @@
 //! CodeBuddy's and WorkBuddy's hooks. Both ask for permission; CodeBuddy also
 //! reports completed turns, whose final message comes from its transcript.
 use crate::hooks::{
-    stop, Began, Begin, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY,
+    stop, Began, Begin, Completed, Completion, Hooks, Layout, Permission, Reply, QUOTED_COMMAND,
 };
 use crate::HookEvent;
 use crate::{text, Location};
@@ -43,7 +43,7 @@ pub static CODEBUDDY: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: POSIX_ONLY,
+    launch: QUOTED_COMMAND,
 };
 
 pub static WORKBUDDY: Hooks = Hooks {
@@ -79,7 +79,7 @@ pub static WORKBUDDY: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: POSIX_ONLY,
+    launch: QUOTED_COMMAND,
 };
 
 /// A prompt starts a turn. WorkBuddy runs one engine per turn and its MCP

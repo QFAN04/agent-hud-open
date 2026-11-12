@@ -30,7 +30,8 @@ mod worker;
 //   panel_builder, place, shown          create, position and show a HUD window
 //   measure_screens, screen              display identity, notch and menu bar
 //   TextFocusOrigin, begin_text_focus,   the explicit keyboard-focus lease
-//     end_text_focus
+//     end_text_focus,
+//     is_text_focus_active
 //   set_ignore_cursor                    pass input through all but the reported regions
 //   set_drag_cursor, global_pointer,     pointer and button state while hovering
 //     left_mouse_down, pointer_keys        or dragging

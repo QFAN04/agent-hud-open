@@ -90,7 +90,7 @@ fn poll_pointer(app: tauri::AppHandle, shared: Arc<Shared>) {
             ended = Some(true);
             let _ = apply_ignore_cursor(&window, &mut state, true, true);
         }
-        if state.text_focus.is_some() && (!visible || !window.is_focused().unwrap_or(true)) {
+        if state.text_focus.is_some() && (!visible || !host::is_text_focus_active(&window)) {
             let _ = release_text_focus(&window, &mut state);
         }
         if !visible {

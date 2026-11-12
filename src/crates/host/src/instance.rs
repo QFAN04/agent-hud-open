@@ -10,6 +10,16 @@
 use agent_hud_runtime::instance::{self, CollectorError, CollectorLocks};
 use std::path::{Path, PathBuf};
 
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as host;
+
+#[cfg(not(windows))]
+mod unix;
+#[cfg(not(windows))]
+use unix as host;
+
 pub(crate) enum Launch {
     /// Run only while every resource lock remains owned.
     Run(CollectorLocks),
@@ -63,8 +73,7 @@ pub(crate) fn unavailable(error: &str) {
 }
 
 fn same_file(a: &Path, b: Option<&Path>) -> bool {
-    let canonical = |path: &Path| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
-    b.is_some_and(|b| canonical(a) == canonical(b))
+    b.is_some_and(|b| host::same_file(a, b))
 }
 
 /// Says which copy runs and that it must quit first. In the system's

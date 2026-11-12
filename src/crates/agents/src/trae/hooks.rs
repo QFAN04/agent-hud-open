@@ -8,7 +8,9 @@
 //! No permission is answered from the HUD: a hook's `allow` does not lift a
 //! tool TRAE asks about by itself, so a request stays in TRAE's window and
 //! the HUD only shows that the session waits.
-use crate::hooks::{stop, Began, Begin, Completed, Completion, Hooks, Layout, Setup, POSIX_ONLY};
+use crate::hooks::{
+    stop, Began, Begin, Completed, Completion, Hooks, Layout, Setup, QUOTED_COMMAND,
+};
 use crate::process::Imported;
 use crate::{text, Location};
 use serde_json::Value;
@@ -38,7 +40,7 @@ const fn hooks(folder: &'static [&'static str]) -> Hooks {
         compaction: None,
         rewake: None,
         prefixed_sessions: true,
-        launch: POSIX_ONLY,
+        launch: QUOTED_COMMAND,
     }
 }
 

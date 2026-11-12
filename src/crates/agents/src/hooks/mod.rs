@@ -2,11 +2,12 @@
 //! how its requests are answered and how a hook is launched on each OS. Each
 //! client states its own in `<client>/hooks.rs`; the functions here read that
 //! data and never name a client.
-use crate::{by_id, text, HookEvent, PerOs, Support, ALL};
+use crate::{by_id, text, HookEvent, PerOs, ALL};
 use serde_json::Value;
 
 pub mod configuration;
 pub mod events;
+mod launch;
 mod layout;
 pub mod observer;
 mod patch;
@@ -15,9 +16,11 @@ pub mod request;
 pub mod turn_log;
 pub mod windows;
 
+pub use launch::{Launch, POSIX_ONLY, QUOTED_COMMAND};
 pub use layout::{Handler, Layout, Text, TextEdit};
 pub use observer::Observer;
 pub use permission::{screen, Files, Permission, Policy, PolicyRule, Reply, RULE_ASKS};
+pub use windows::windows_hook_command;
 
 /// A client's hooks.
 pub struct Hooks {
@@ -174,18 +177,6 @@ pub struct Compaction {
     pub legacy_flag: Option<&'static str>,
 }
 
-/// How a hook's command is written into the settings file.
-pub enum Launch {
-    /// A POSIX command line: `'<agent-hud>' <flag> <client>`.
-    Command,
-    /// The executable in `command`, the flag and client in `args`.
-    CommandArgs,
-    /// A PowerShell line in `commandWindows`, beside the POSIX command.
-    PowerShell,
-    /// `exec` and `args` in place of the handler's command.
-    ExecArgs,
-}
-
 /// A step the user takes in a client itself before it runs the hooks Agent
 /// HUD put in its settings (TRAE asks to turn its hooks on, Codex to allow
 /// each one).
@@ -285,14 +276,6 @@ pub fn stop(payload: &Value, now_ms: i64, prompt_turns: bool) -> Option<Complete
         usage: None,
     })
 }
-
-/// A hook launched as a POSIX command on macOS and Linux, and not launched on
-/// Windows until its contract there is documented.
-pub const POSIX_ONLY: PerOs<Launch> = PerOs {
-    macos: Support::Verified(Launch::Command),
-    windows: Support::Unsupported("no verified Windows hook launch contract"),
-    linux: Support::Unverified(Launch::Command),
-};
 
 #[cfg(test)]
 mod tests;

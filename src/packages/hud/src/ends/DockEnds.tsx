@@ -31,6 +31,7 @@ export function DockEnds({
   cardVisible,
   showing,
   dragging,
+  retracted = false,
   light,
   fill,
   outline,
@@ -55,6 +56,7 @@ export function DockEnds({
   /** An end's panel is on show. */
   showing: boolean;
   dragging: boolean;
+  retracted?: boolean;
   light: boolean;
   fill: string;
   outline: string;
@@ -70,7 +72,7 @@ export function DockEnds({
   const zh = useFormat().language === "zh";
   const notch = config.mode === "notch";
   // The notch becomes the card: its ends wait in its row till it is back.
-  const hidden = dragging || (notch && cardVisible);
+  const hidden = dragging || retracted || (notch && cardVisible);
   const { setHovered } = ends;
   useEffect(() => {
     ends.cardFrame.current = cardVisible && !showing ? frame : null;

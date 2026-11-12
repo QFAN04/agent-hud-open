@@ -188,7 +188,7 @@ impl Log {
         let model = format!(
             "{}#{}",
             self.model,
-            self.source_state["provider"].as_str().unwrap_or("Unknown")
+            route(self.source_state["provider"].as_str().unwrap_or("Unknown"))
         );
         let duration_ms = self.call_timing.since_request(0, at);
         self.count_timed_source(
@@ -205,6 +205,18 @@ impl Log {
             false,
             duration_ms,
         );
+    }
+}
+
+/// The route a DeepSeek Harness provider id names in HUD's terminology. The
+/// Harness calls its platform account provider `deepseek-account`; HUD's
+/// balance reader, billing queries and price catalog call that route
+/// `deepseek-official`, so usage recorded under either name prices and bills
+/// as DeepSeek's own API.
+fn route(provider: &str) -> &str {
+    match provider {
+        "deepseek-account" => "deepseek-official",
+        other => other,
     }
 }
 
@@ -335,5 +347,18 @@ mod tests {
         let rows = (ITEMS.read)(&older, 0);
         assert_eq!(rows[0].text.as_deref(), Some("Fix the build"));
         assert!(rows[0].is_prompt);
+    }
+
+    #[test]
+    fn deepseek_account_provider_routes_under_deepseek_official() {
+        let mut log = Log::new("session.v4.jsonl".into(), "deepseek");
+        log.parse(
+            &json!({"type":"session","version":4,"id":"d1","createdAt":"2026-10-23T07:59:00Z"}),
+        );
+        log.parse(&json!({"type":"request/context","time":"2026-10-23T08:00:00Z","seq":1,"data":{"model":"deepseek-chat","provider":"deepseek-account"}}));
+        log.parse(&json!({"type":"assistant/message","time":"2026-10-23T08:00:02Z","seq":2,"data":{"turn":1,"step":1,"usage":{"inputTokens":100,"outputTokens":200}}}));
+        let event = log.meter_events.values().next().unwrap();
+        assert_eq!(event.model, "deepseek-chat#deepseek-official");
+        assert_eq!(route("openrouter"), "openrouter");
     }
 }

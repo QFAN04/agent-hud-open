@@ -4,6 +4,16 @@ use std::{collections::HashMap, path::PathBuf};
 
 mod files;
 
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as host;
+
+#[cfg(not(windows))]
+mod unix;
+#[cfg(not(windows))]
+use unix as host;
+
 pub(super) use files::contents;
 pub(crate) use files::{target, write_contents};
 
@@ -41,12 +51,7 @@ impl InstallPlan {
 }
 pub(super) fn canonical(context: &InstallContext) -> Result<(), String> {
     let fixed=context.canonical_executable.as_ref().ok_or_else(|| l10n::text("这个版本还没有指定固定的回调程序，在迁移指定正式安装路径之前请保持客户端回调关闭。", "This build has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path."))?;
-    let text = fixed.to_string_lossy();
-    if !fixed.is_absolute()
-        || text.starts_with("/Volumes/")
-        || text.contains("/AppTranslocation/")
-        || fixed.components().any(|p| p.as_os_str() == "target")
-    {
+    if host::disallowed_path(fixed) {
         return Err(l10n::text("客户端回调不能指向编译目录、磁盘映像或被系统转移的副本，请使用指定的固定安装程序。", "Hooks cannot point at target builds, disk images or translocated copies. Use the approved fixed installed executable."));
     }
     let resolved = fixed.canonicalize().map_err(|_| {
@@ -55,14 +60,13 @@ pub(super) fn canonical(context: &InstallContext) -> Result<(), String> {
             "The approved fixed hook executable is unavailable",
         )
     })?;
-    let physical = resolved.to_string_lossy();
-    if physical.starts_with("/Volumes/")
-        || physical.contains("/AppTranslocation/")
-        || resolved.components().any(|p| p.as_os_str() == "target")
-    {
+    if host::disallowed_path(&resolved) {
         return Err(l10n::text("固定回调路径指向一个临时编译版本，客户端设置未作改动。", "The fixed hook path resolves to a transient target build; client settings were not changed."));
     }
-    if context.executable != *fixed || !fixed.is_file() {
+    if host::disallowed_path(&context.executable)
+        || !host::same_executable(&context.executable, fixed, &resolved)
+        || !fixed.is_file()
+    {
         return Err(l10n::text("当前程序不是指定的固定回调程序，客户端设置未作改动。", "This executable is not the approved fixed hook owner; client settings were not changed."));
     }
     Ok(())

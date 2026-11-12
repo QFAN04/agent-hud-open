@@ -1,25 +1,27 @@
-//! Antigravity on Windows: a message goes to the service that opened its
-//! session (`crate::clients::antigravity::service::message_session`).
-//! Interrupting is not adapted yet; an adapter would send
-//! `CancelCascadeInvocation` to that same service, as `MessageSession::send`
-//! does for a message.
+//! Antigravity on Windows: messages and interrupts go to the verified
+//! service that opened the session
+//! (`crate::clients::antigravity::service::message_session`).
 use super::cascade_config::{default_cascade_config_from_status, trajectory_cascade_config};
 use super::*;
 
-/// What a message may ask for: no interrupt.
+/// Supported delivery operations on Windows.
 pub(crate) const OPERATIONS: &[Operation] = &[
     Operation::Automatic,
     Operation::Start,
     Operation::Steer,
     Operation::Enqueue,
+    Operation::Interrupt,
 ];
-pub(crate) const NOTICE: &str = "Sends to an existing uniquely identified session on its running Antigravity local language server. Interrupt and new-session start remain unavailable on Windows.";
+pub(crate) const NOTICE: &str = "Sends to and interrupts an existing uniquely identified session on its running Antigravity local language server.";
 
-/// Interrupting is not adapted on Windows.
-pub(super) fn interrupt(_cascade_id: &str) -> Result<()> {
-    Err(Failure::Unsupported(
-        "Interrupting Antigravity sessions is unavailable on Windows".into(),
-    ))
+/// Interrupts an existing Antigravity cascade on the verified service that opened it.
+pub(super) fn interrupt(cascade_id: &str) -> Result<()> {
+    use crate::clients::antigravity::service::message_session;
+    message_session(cascade_id)
+        .map_err(windows_message_error)?
+        .interrupt()
+        .map(|_| ())
+        .map_err(windows_message_error)
 }
 
 /// Read a model configuration from the same verified owner that will receive
@@ -53,5 +55,31 @@ fn windows_message_error(error: crate::clients::antigravity::service::MessageErr
         MessageError::Unavailable(reason) => Failure::Unavailable(reason),
         MessageError::Invalid(reason) => Failure::InvalidInput(reason),
         MessageError::Uncertain => Failure::AcceptanceUncertain,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clients::antigravity::service::MessageError;
+
+    #[test]
+    fn windows_delivery_advertises_interrupt_and_maps_errors() {
+        assert!(OPERATIONS.contains(&Operation::Interrupt));
+        assert!(OPERATIONS.contains(&Operation::Steer));
+        assert!(OPERATIONS.contains(&Operation::Enqueue));
+        assert!(NOTICE.contains("interrupt"));
+        assert_eq!(
+            windows_message_error(MessageError::Uncertain),
+            Failure::AcceptanceUncertain
+        );
+        assert_eq!(
+            windows_message_error(MessageError::Invalid("bad".into())),
+            Failure::InvalidInput("bad".into())
+        );
+        assert_eq!(
+            windows_message_error(MessageError::Unavailable("none".into())),
+            Failure::Unavailable("none".into())
+        );
     }
 }

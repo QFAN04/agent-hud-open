@@ -1,5 +1,5 @@
 //! Cursor's completion hook, in its version-1 settings.
-use crate::hooks::{Began, Begin, Completed, Completion, Handler, Hooks, Layout, POSIX_ONLY};
+use crate::hooks::{Began, Begin, Completed, Completion, Handler, Hooks, Layout, QUOTED_COMMAND};
 use crate::text;
 use crate::{HookEvent, Location, Usage};
 use serde_json::Value;
@@ -32,7 +32,7 @@ pub static HOOKS: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: POSIX_ONLY,
+    launch: QUOTED_COMMAND,
 };
 
 /// A generation under way: the prompt that starts it, and the tool calls and

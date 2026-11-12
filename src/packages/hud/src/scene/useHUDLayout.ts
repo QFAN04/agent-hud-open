@@ -15,6 +15,13 @@ import { peekLineWidth } from "./AgentPeek";
 import { SIMPLE_EDGE_MARGIN } from "./simple-panel";
 import { useNotchGeometry } from "./NotchSurface";
 import { useRequestDelivery } from "./request-delivery";
+import {
+  bodyMaxHeight,
+  expandedPanelHeight,
+  isSurfaceBordered,
+  peekBubbleHeight,
+  SURFACE_BORDER_PX,
+} from "./surface-size";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 
 export interface UseHUDLayoutArgs {
@@ -107,6 +114,8 @@ export function useHUDLayout({
     (config.mode === "simple" ? config.simpleSize : 26) / 26,
   );
   const simplePeek = Boolean(peek && config.mode === "simple");
+  const bordered = isSurfaceBordered(config.mode, detached, simplePeek);
+  const borderInset = bordered ? SURFACE_BORDER_PX : 0;
   const surfaceFlare = open
     ? HUD_METRICS.expandedFlare
     : HUD_METRICS.collapsedFlare;
@@ -163,16 +172,11 @@ export function useHUDLayout({
             width: peekWidth,
             height: simplePeek
               ? 26 * scale
-              : (20 +
-                  (1 +
-                    focusedVendor.quotas.length +
-                    (focusedVendor.balance ? 1 : 0)) *
-                    18) *
-                scale,
+              : peekBubbleHeight(focusedVendor, scale, bordered),
           }
         : {
             width: fullWidth,
-            height: Math.max(80, Math.min(contentHeight, screen.height - 80)),
+            height: expandedPanelHeight(contentHeight, screen.height, bordered),
           };
 
   const focusedIndex = vendors.findIndex((v) => v.key === focusedVendor?.key);
@@ -256,7 +260,11 @@ export function useHUDLayout({
           : edge === "left"
             ? { marginLeft: SIMPLE_EDGE_MARGIN }
             : { marginRight: SIMPLE_EDGE_MARGIN };
-  const measurementWidth = Math.max(1, Math.min(fullWidth, screen.width));
+  const measurementWidth = Math.max(
+    1,
+    Math.min(fullWidth, screen.width) - borderInset,
+  );
+  const maxBodyHeight = bodyMaxHeight(frame.height, surfacePadding, bordered);
 
   return {
     edge,
@@ -274,6 +282,8 @@ export function useHUDLayout({
     peek,
     scale,
     simplePeek,
+    bordered,
+    maxBodyHeight,
     peekTuck,
     targetSize,
     surfaceFlare,

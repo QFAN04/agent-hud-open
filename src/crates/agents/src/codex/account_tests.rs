@@ -478,3 +478,20 @@ fn a_pi_error_preserves_an_additional_homes_error() {
     assert!(notice.contains("Sign-in expired"));
     assert!(notice.contains("Sign in to ChatGPT again in Pi"));
 }
+
+#[test]
+fn a_consented_relay_clears_invented_plan_windows_but_unconsented_keeps_them() {
+    let config = "model_provider = \"relay\"\n[model_providers.relay]\nname = \"Relay\"\nbase_url = \"https://relay.example.com/v1\"\n";
+    let unconsented = installed(limits(), json!({"email": "a@example.com"}))
+        .file("/u/.codex/config.toml", config);
+    assert_eq!(read(&unconsented).unwrap().quotas.len(), 2);
+
+    let consented = installed(limits(), json!({"email": "a@example.com"}))
+        .file("/u/.codex/config.toml", config);
+    consented
+        .consent
+        .store(true, std::sync::atomic::Ordering::Release);
+    let reading = read(&consented).unwrap();
+    assert!(reading.quotas.is_empty());
+    assert_eq!(reading.account.unwrap()["plan"], "pro");
+}

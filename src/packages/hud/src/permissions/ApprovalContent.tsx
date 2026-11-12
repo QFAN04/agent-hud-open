@@ -114,6 +114,7 @@ export function ApprovalContent({
   backToSession,
   light,
   language,
+  platform,
 }: {
   requests: Approval[];
   selected: Approval;
@@ -126,6 +127,7 @@ export function ApprovalContent({
   backToSession?: (request: Approval) => (() => Promise<boolean>) | undefined;
   light: boolean;
   language?: string;
+  platform?: string;
 }) {
   const zh = language?.startsWith("zh") ?? false;
   const tertiary = light ? "rgba(0,0,0,0.38)" : "rgba(255,255,255,0.38)";
@@ -188,6 +190,7 @@ export function ApprovalContent({
                 request={request}
                 light={light}
                 language={language}
+                platform={platform}
                 onOpenSettings={openSettings}
                 onDecision={
                   decide

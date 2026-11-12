@@ -97,17 +97,25 @@ impl AntigravityTransport for NativeAntigravityTransport {
 
 /// Whether Antigravity's desktop or IDE app is installed in one of `applications`.
 pub fn desktop_installed(applications: &[PathBuf]) -> bool {
+    const MAC_BUNDLES: &[&str] = &["Antigravity.app", "Antigravity IDE.app"];
+    const WINDOWS_EXES: &[&str] = &[
+        "Antigravity.exe",
+        "Antigravity IDE.exe",
+        "antigravity/Antigravity.exe",
+        "Antigravity/Antigravity.exe",
+        "Antigravity IDE/Antigravity.exe",
+        "Antigravity IDE/Antigravity IDE.exe",
+    ];
     applications.iter().any(|folder| {
-        ["Antigravity.app", "Antigravity IDE.app"]
-            .iter()
-            .any(|app| folder.join(app).is_dir())
+        MAC_BUNDLES.iter().any(|app| folder.join(app).is_dir())
+            || WINDOWS_EXES.iter().any(|exe| folder.join(exe).is_file())
     })
 }
 
 /// Starts a new Antigravity cascade in `folder` through the running language server
 /// and sends `request.text` as its first message.
 pub fn start_cascade(folder: &Path, request: &StartRequest) -> Result<StartReceipt> {
-    let uri = format!("file://{}", folder.to_string_lossy());
+    let uri = workspace_uri(folder);
     let started = call(
         "StartCascade",
         json!({
@@ -178,6 +186,50 @@ fn metadata() -> Value {
     })
 }
 
+fn workspace_uri(folder: &Path) -> String {
+    workspace_uri_from_str(&folder.to_string_lossy())
+}
+
+fn workspace_uri_from_str(raw: &str) -> String {
+    let unc = raw
+        .strip_prefix(r"\\?\UNC\")
+        .or_else(|| raw.strip_prefix("//?/UNC/"))
+        .or_else(|| {
+            raw.strip_prefix(r"\\")
+                .filter(|rest| !rest.starts_with("?\\"))
+        })
+        .or_else(|| {
+            raw.strip_prefix("//")
+                .filter(|rest| !rest.starts_with("?/"))
+        });
+    if let Some(unc) = unc {
+        let mut parts = unc.splitn(2, ['\\', '/']);
+        let host = parts.next().unwrap_or("");
+        let rest = parts.next().unwrap_or("").replace('\\', "/");
+        if !host.is_empty() {
+            if let Ok(mut url) = reqwest::Url::parse(&format!("file://{host}/")) {
+                url.set_path(&format!("/{rest}"));
+                return url.to_string();
+            }
+        }
+    }
+    let trimmed = raw
+        .strip_prefix(r"\\?\")
+        .or_else(|| raw.strip_prefix("//?/"))
+        .unwrap_or(raw);
+    let forward = trimmed.replace('\\', "/");
+    let normalized = if forward.starts_with('/') {
+        forward
+    } else {
+        format!("/{forward}")
+    };
+    if let Ok(mut url) = reqwest::Url::parse("file:///") {
+        url.set_path(&normalized);
+        return url.to_string();
+    }
+    format!("file://{normalized}")
+}
+
 fn call(method: &str, body: Value) -> Result<Value> {
     crate::clients::antigravity::service::call(method, &body).map_err(|error| {
         if error.contains("no running Antigravity service") {
@@ -186,4 +238,49 @@ fn call(method: &str, body: Value) -> Result<Value> {
             Failure::Rejected(error)
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn desktop_installed_accepts_mac_bundles_and_windows_executables() {
+        let temp = tempfile::tempdir().unwrap();
+        let apps = temp.path().join("apps");
+        let programs = temp.path().join("Programs");
+        fs::create_dir_all(apps.join("Antigravity.app")).unwrap(); // plain directory
+        fs::create_dir_all(programs.join("antigravity")).unwrap(); // plain directory
+        fs::write(programs.join("antigravity/Antigravity.exe"), b"").unwrap();
+
+        assert!(desktop_installed(std::slice::from_ref(&apps)));
+        assert!(desktop_installed(std::slice::from_ref(&programs)));
+        assert!(desktop_installed(&[programs.join("antigravity")]));
+        assert!(!desktop_installed(&[temp.path().join("missing")]));
+    }
+
+    #[test]
+    fn workspace_uri_formats_unix_windows_drive_verbatim_and_unc_paths() {
+        assert_eq!(
+            workspace_uri_from_str("/Users/alice/Agent HUD"),
+            "file:///Users/alice/Agent%20HUD"
+        );
+        assert_eq!(
+            workspace_uri_from_str(r"C:\Users\alice\Agent HUD"),
+            "file:///C:/Users/alice/Agent%20HUD"
+        );
+        assert_eq!(
+            workspace_uri_from_str(r"\\?\C:\Users\alice\Agent HUD"),
+            "file:///C:/Users/alice/Agent%20HUD"
+        );
+        assert_eq!(
+            workspace_uri_from_str(r"\\fileserver\share\Agent HUD"),
+            "file://fileserver/share/Agent%20HUD"
+        );
+        assert_eq!(
+            workspace_uri_from_str(r"\\?\UNC\fileserver\share\Agent HUD"),
+            "file://fileserver/share/Agent%20HUD"
+        );
+    }
 }

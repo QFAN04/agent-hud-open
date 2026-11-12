@@ -72,3 +72,36 @@ fn tokenless_cli_fallback_uses_the_executable_not_command_arguments() {
     assert_eq!(found.as_deref(), Some(executable));
     assert!(cli_from(vec![process(1, "agy", "agy")]).is_none());
 }
+
+#[test]
+fn parses_windows_arch_suffixed_and_ide_language_server_paths() {
+    let found = parse_servers(vec![
+        process(
+            54156,
+            r"C:\Users\alice\AppData\Local\Programs\antigravity\resources\bin\language_server.exe",
+            "language_server.exe --csrf_token=tok-win --app_data_dir antigravity",
+        ),
+        process(
+            54157,
+            r"C:\Program Files\Antigravity\resources\bin\language_server_windows_x64.exe",
+            "language_server_windows_x64.exe --csrf_token tok-x64",
+        ),
+        process(
+            54158,
+            r"C:\Program Files\Antigravity IDE\resources\bin\language_server_windows_x64.exe",
+            "language_server_windows_x64.exe --csrf_token=tok-ide",
+        ),
+        process(
+            54159,
+            r"C:\Other\language_server_windows_x64.exe",
+            "language_server_windows_x64.exe --csrf_token tok-ignore",
+        ),
+    ]);
+    assert_eq!(
+        found.iter().map(|server| server.pid).collect::<Vec<_>>(),
+        [54156, 54157, 54158]
+    );
+    assert_eq!(found[0].token, "tok-win");
+    assert_eq!(found[1].token, "tok-x64");
+    assert_eq!(found[2].token, "tok-ide");
+}

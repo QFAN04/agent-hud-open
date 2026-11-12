@@ -13,20 +13,6 @@ use line::plan_file;
 const METADATA: &str = "_agentHudAntigravityStatusLine";
 const FLAG: &str = "--antigravity-statusline-hook";
 
-fn supported() -> bool {
-    agent_hud_agents::hooks::POSIX_ONLY
-        .on(crate::os::OS)
-        .value()
-        .is_some()
-}
-
-fn unavailable() -> String {
-    l10n::text(
-        "此系统暂不支持 Antigravity CLI 状态栏回调，设置未作改动。",
-        "Antigravity CLI status-line callbacks are unavailable on this system; settings were not changed.",
-    )
-}
-
 fn conflict() -> String {
     l10n::text(
         "Antigravity CLI 的状态栏或 Agent HUD 安装记录已被其他程序修改，请先恢复原有配置。",
@@ -39,9 +25,7 @@ pub(super) fn status(context: Option<&InstallContext>) -> Value {
         .map(|context| context.home.clone())
         .or_else(|| crate::os::home_dir().ok())
         .map(|home| home.join(".gemini/antigravity-cli/settings.json"));
-    let notice = if !supported() {
-        Some(unavailable())
-    } else if let Some(context) = context {
+    let notice = if let Some(context) = context {
         install::canonical(context).err()
     } else {
         Some(l10n::text(
@@ -154,9 +138,6 @@ fn plan(
     previous: &[PathBuf],
     next: &[PathBuf],
 ) -> Result<AntigravityCliChange, String> {
-    if !supported() {
-        return Err(unavailable());
-    }
     install::canonical(context)?;
     let expand = |path: &Path| {
         let text = path

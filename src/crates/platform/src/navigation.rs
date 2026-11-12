@@ -90,6 +90,42 @@ fn claude_project_id<'a>(value: &'a str, prefix: &str) -> Option<&'a str> {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_'))
     .then_some(value)
 }
+fn is_absolute_workspace_path(path: &str) -> bool {
+    if path.starts_with('/') {
+        return true;
+    }
+    if let Some(rest) = path.strip_prefix(r"\\") {
+        return rest.chars().any(|c| c != '\\');
+    }
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/')
+}
+
+fn cursor_file_url(cwd: &str) -> Option<String> {
+    let mut url = reqwest::Url::parse("cursor://file").ok()?;
+    let path = if cwd.starts_with('/') {
+        cwd.to_owned()
+    } else if let Some(unc) = cwd.strip_prefix(r"\\?\UNC\") {
+        format!("//{}", unc.replace('\\', "/"))
+    } else if let Some(local) = cwd.strip_prefix(r"\\?\") {
+        let forward = local.replace('\\', "/");
+        if forward.starts_with('/') {
+            forward
+        } else {
+            format!("/{forward}")
+        }
+    } else if let Some(unc) = cwd.strip_prefix(r"\\") {
+        format!("//{}", unc.replace('\\', "/"))
+    } else {
+        format!("/{}", cwd.replace('\\', "/"))
+    };
+    url.set_path(&path);
+    Some(url.into())
+}
+
 /// The folder of a local Cursor session (one with no cloud `bc-` id), which
 /// opens in Cursor itself where the host can; its `cursor://file` link is
 /// the fallback, and Cursor asks before it follows one.
@@ -104,7 +140,7 @@ pub(super) fn cursor_folder(target: &Value) -> Option<&std::path::Path> {
         return None;
     }
     let cwd = target["cwd"].as_str()?.trim();
-    cwd.starts_with('/').then(|| std::path::Path::new(cwd))
+    is_absolute_workspace_path(cwd).then(|| std::path::Path::new(cwd))
 }
 
 pub fn session_url(target: &Value) -> Option<String> {
@@ -126,7 +162,7 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
     }
     let id = target["id"].as_str()?;
     match kind {
-        "claude-project-thread" if os == Os::MacOs => {
+        "claude-project-thread" if matches!(os, Os::MacOs | Os::Windows) => {
             let project = claude_project_id(target["projectId"].as_str()?, "chan_")?;
             let thread = claude_project_id(id, "cmsg_")?;
             (!thread.starts_with("cmsg_pending_"))
@@ -192,12 +228,10 @@ fn session_url_on(target: &Value, os: Os, registered: impl Fn(&str) -> bool) -> 
                 return Some(url.into());
             }
             let cwd = target["cwd"].as_str()?.trim();
-            if !cwd.starts_with('/') {
+            if !is_absolute_workspace_path(cwd) {
                 return None;
             }
-            let mut url = reqwest::Url::parse("cursor://file").ok()?;
-            url.set_path(cwd);
-            Some(url.into())
+            cursor_file_url(cwd)
         }
         _ => None,
     }

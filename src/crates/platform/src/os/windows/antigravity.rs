@@ -171,4 +171,34 @@ mod tests {
         assert!(parse_processes(b"[]").unwrap().is_empty());
         assert!(parse_processes(b"not json").is_err());
     }
+    #[test]
+    fn parses_broadened_language_server_and_agy_entries_filtering_invalid_rows() {
+        let payload = serde_json::json!([
+            {
+                "pid": 54156,
+                "executable": r"C:\Users\alice\AppData\Local\Programs\antigravity\resources\bin\language_server.exe",
+                "command": "language_server.exe --csrf_token=secret-1 --app_data_dir antigravity"
+            },
+            {
+                "pid": 54157,
+                "executable": r"C:\Program Files\Antigravity\resources\bin\language_server_windows_x64.exe",
+                "command": "language_server_windows_x64.exe --csrf_token secret-2"
+            },
+            {
+                "pid": 54158,
+                "executable": r"C:\Users\alice\AppData\Local\Programs\antigravity\resources\bin\agy.exe",
+                "command": "agy.exe --extension_server_port 4123 --extension_server_csrf_token ext-3"
+            },
+            { "pid": 0, "executable": "C:\\bad.exe", "command": "bad.exe" },
+            { "pid": 99, "executable": "", "command": "missing.exe" },
+            { "pid": 100, "executable": "C:\\empty_cmd.exe", "command": "" }
+        ]);
+        let parsed = parse_processes(payload.to_string().as_bytes()).unwrap();
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].pid, 54156);
+        assert!(parsed[1]
+            .executable
+            .ends_with("language_server_windows_x64.exe"));
+        assert!(parsed[2].executable.ends_with("agy.exe"));
+    }
 }
