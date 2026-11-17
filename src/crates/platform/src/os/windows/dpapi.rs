@@ -1,5 +1,4 @@
 use super::acl::Local;
-use super::{app_support, claude_desktop_bases, home_dir};
 use agent_hud_agents::Answer;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use sha2::{Digest, Sha256};
@@ -247,6 +246,7 @@ pub(super) fn decrypt_blob(
     String::from_utf8(payload.to_vec()).map_or(Answer::Failed, Answer::Found)
 }
 
+#[cfg(test)]
 pub(super) fn unseal_in_bases(bases: &[PathBuf], encrypted: &[u8]) -> Answer<String> {
     if encrypted.is_empty() {
         return Answer::Missing;
@@ -269,16 +269,4 @@ pub(super) fn unseal_in_bases(bases: &[PathBuf], encrypted: &[u8]) -> Answer<Str
         return last;
     }
     decrypt_blob(encrypted, None, false, None)
-}
-
-pub(crate) fn unseal_safe_storage(app: &str, encrypted: &[u8]) -> Answer<String> {
-    let Ok(home) = home_dir() else {
-        return Answer::Failed;
-    };
-    let env = super::current_env();
-    let mut bases = vec![app_support(&home, &env).join(app)];
-    if app == "Claude" {
-        bases.extend(claude_desktop_bases(&home, &env));
-    }
-    unseal_in_bases(&bases, encrypted)
 }

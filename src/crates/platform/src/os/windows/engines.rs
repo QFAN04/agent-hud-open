@@ -157,33 +157,6 @@ fn claude_local_versions(root: &Path) -> Vec<PathBuf> {
     found.into_iter().map(|(_, path)| path).collect()
 }
 
-/// `<root>\*\*\<file>`, most recently modified first.
-fn newest_nested(root: &Path, file: &str) -> Vec<PathBuf> {
-    let children = |dir: &Path| -> Vec<PathBuf> {
-        std::fs::read_dir(dir)
-            .into_iter()
-            .flatten()
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.is_dir())
-            .collect()
-    };
-    let mut found: Vec<_> = children(root)
-        .iter()
-        .flat_map(|version| children(version))
-        .map(|dir| dir.join(file))
-        .filter(|path| path.is_file())
-        .map(|path| {
-            let modified = std::fs::metadata(&path)
-                .and_then(|meta| meta.modified())
-                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            (modified, path)
-        })
-        .collect();
-    found.sort_by_key(|entry| std::cmp::Reverse(entry.0));
-    found.into_iter().map(|(_, path)| path).collect()
-}
-
 pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> Vec<PathBuf> {
     let mut paths = if name == "codex" {
         super::codex::installation(home, env).engines
@@ -219,9 +192,7 @@ pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> V
             paths.extend(claude_local_versions(
                 &home.join(".local/share/claude/versions"),
             ));
-            for base in claude_desktop_bases(home, env) {
-                paths.extend(newest_nested(&base.join("claude-code"), "claude.exe"));
-            }
+            paths.extend(super::claude::engines(home, env));
         }
         "codex" => paths.push(home.join(".codex/.sandbox-bin/codex.exe")),
         _ => {}
