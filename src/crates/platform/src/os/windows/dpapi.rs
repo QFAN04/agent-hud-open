@@ -2,11 +2,7 @@ use super::acl::Local;
 use agent_hud_agents::Answer;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use sha2::{Digest, Sha256};
-use std::{
-    mem::size_of,
-    path::{Path, PathBuf},
-    ptr,
-};
+use std::{mem::size_of, path::Path, ptr};
 use windows_sys::Win32::{
     Foundation::{GetLastError, ERROR_ACCESS_DENIED, ERROR_NO_SUCH_LOGON_SESSION, STATUS_SUCCESS},
     Security::Cryptography::{
@@ -247,7 +243,7 @@ pub(super) fn decrypt_blob(
 }
 
 #[cfg(test)]
-pub(super) fn unseal_in_bases(bases: &[PathBuf], encrypted: &[u8]) -> Answer<String> {
+pub(super) fn unseal_in_bases(bases: &[std::path::PathBuf], encrypted: &[u8]) -> Answer<String> {
     if encrypted.is_empty() {
         return Answer::Missing;
     }
