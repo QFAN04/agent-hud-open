@@ -109,7 +109,20 @@ pub(crate) fn engine_executable(path: &Path) -> bool {
     super::unix::executable(path)
 }
 pub(crate) fn configure_command(_command: &mut Command) {}
+pub(crate) fn spawn(command: &mut Command) -> std::io::Result<std::process::Child> {
+    command.spawn()
+}
 pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> Vec<PathBuf> {
+    if name == "workbuddy-app" {
+        // Only WorkBuddy's own install, never whatever else carries the name.
+        return [
+            "/usr/bin/workbuddy",
+            "/opt/workbuddy/workbuddy",
+            "/opt/WorkBuddy/workbuddy",
+        ]
+        .map(PathBuf::from)
+        .to_vec();
+    }
     let mut paths = vec![
         home.join(".local/bin").join(name),
         home.join(".bun/bin").join(name),

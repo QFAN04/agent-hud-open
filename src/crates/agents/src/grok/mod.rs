@@ -84,7 +84,7 @@ pub static BOT: Agent = Agent {
     items: None,
     sources: PerOs {
         macos: Support::Verified(&BOT_SOURCES),
-        windows: Support::Unverified(&BOT_SOURCES),
+        windows: Support::Verified(&BOT_SOURCES),
         linux: Support::Unsupported("Grok Bot's cache location on Linux is not known yet"),
     },
     discovery: &BOT_DISCOVERY,

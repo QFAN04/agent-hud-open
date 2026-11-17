@@ -38,6 +38,7 @@ impl Drop for Local {
         }
     }
 }
+/// One SID from this process's token (`TokenUser` or `TokenOwner`), as text.
 fn token_sid(class: i32) -> Result<String, String> {
     unsafe {
         let mut token: HANDLE = std::ptr::null_mut();
@@ -104,12 +105,12 @@ pub(super) fn security(inherit: bool) -> Result<Local, String> {
 pub(crate) fn owned_path(path: &Path) -> bool {
     path_owner(path).is_some_and(|owner| sid().is_ok_and(|sid| sid == owner))
 }
-/// Owned by the token's default owner. Only transcript reads accept this
-/// (`files::user_transcript`); the app's own folders and inbox never do,
-/// since any elevated process could plant a file with that owner.
+/// Owned by this process's default owner. Only transcript reads accept this
+/// (`files::user_transcript`); the app's own folders and inbox never do.
 pub(crate) fn owned_by_default_owner(path: &Path) -> bool {
     path_owner(path).is_some_and(|owner| default_owner() == Some(owner.as_str()))
 }
+/// A file's owner SID, as text.
 fn path_owner(path: &Path) -> Option<String> {
     let mut owner = std::ptr::null_mut();
     let mut descriptor = std::ptr::null_mut();
@@ -145,6 +146,15 @@ fn path_owner(path: &Path) -> Option<String> {
         String::from_utf16_lossy(std::slice::from_raw_parts(text.0.cast::<u16>(), count))
     })
 }
+/// The directory that failed the owner check, and what to do about it, so a
+/// failed start names the folder instead of only the rule.
+fn ownership_hint(path: &Path) -> String {
+    format!(
+        "The IPC directory must belong to the current user: {}. Set the folder's owner to your Windows account in Properties > Security > Advanced, or remove the folder so Agent HUD creates it again.",
+        path.display()
+    )
+}
+
 pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
     if let Some(parent) = path
         .parent()
@@ -181,7 +191,7 @@ pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
         return Err("The IPC directory cannot be a reparse point".into());
     }
     if !owned_path(path) {
-        return Err("The IPC directory must belong to the current user".into());
+        return Err(ownership_hint(path));
     }
     if unsafe {
         SetFileSecurityW(
@@ -233,4 +243,17 @@ pub(crate) fn private_file(path: &Path, create_new: bool) -> io::Result<std::fs:
         ));
     }
     Ok(file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ownership_hint;
+    use std::path::Path;
+
+    #[test]
+    fn ownership_hint_names_the_directory_and_the_remedy() {
+        let message = ownership_hint(Path::new(r"C:\Users\me\AppData\Local\AgentHUD\ipc"));
+        assert!(message.contains(r"C:\Users\me\AppData\Local\AgentHUD\ipc"));
+        assert!(message.contains("Set the folder's owner"));
+    }
 }

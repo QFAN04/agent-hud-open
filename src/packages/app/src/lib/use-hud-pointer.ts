@@ -13,10 +13,23 @@ const outsidePointer: HUDNativePointer = {
   metaKey: null,
   shiftKey: null,
 };
+/** The pointer on the guide's window beside the HUD is not on the HUD: it
+ * clicks the window's buttons but never opens the panel. */
+function offGuide<T extends HUDNativePointer>(pointer: T): T {
+  const guide = document.querySelector(".hud-guide")?.getBoundingClientRect();
+  const point = pointer.point;
+  if (!pointer.inside || !point || !guide?.width) return pointer;
+  const scene = document.querySelector(".hud-scene")?.getBoundingClientRect();
+  const x = point.x + (scene?.left ?? 0);
+  const y = point.y + (scene?.top ?? 0);
+  const over =
+    x >= guide.left && x <= guide.right && y >= guide.top && y <= guide.bottom;
+  return over ? { ...pointer, inside: false } : pointer;
+}
 /** Only outer HUD geometry wakes native reports; animated bot descendants never do. */
 function observeHUDContours(report: () => void) {
   const selector =
-    ".hud-scene, .hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end";
+    ".hud-scene, .hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide";
   let timer: ReturnType<typeof setTimeout> | null = null,
     last = 0;
   const queue = () => {
@@ -79,7 +92,7 @@ export function useHUDPointer(screenId: string) {
       (event) => {
         if (disposed || event.payload.screenId !== screenId) return;
         pointerRevision.current += 1;
-        setNativePointer(event.payload);
+        setNativePointer(offGuide(event.payload));
       },
     );
     return () => {
@@ -113,7 +126,7 @@ export function useHUDPointer(screenId: string) {
           revision === pointerRevision.current &&
           status.pointer.screenId === screenId
         ) {
-          setNativePointer(status.pointer);
+          setNativePointer(offGuide(status.pointer));
         }
       } catch (error) {
         previous = "";
@@ -127,16 +140,21 @@ export function useHUDPointer(screenId: string) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (disposed) return;
+        // In the canvas's coordinates, as the host's pointer is: the window
+        // may show only the part of the canvas next to the HUD's edge.
+        const scene = document
+          .querySelector(".hud-scene")
+          ?.getBoundingClientRect();
         const regions = [
           ...document.querySelectorAll(
-            ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end",
+            ".hud-resting-strip, .hud-expanded-surface, .hud-grab-surface, .hud-hover-floor, .hud-dock-end, .hud-guide",
           ),
         ]
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {
-              x: rect.x,
-              y: rect.y,
+              x: rect.x - (scene?.left ?? 0),
+              y: rect.y - (scene?.top ?? 0),
               width: rect.width,
               height: rect.height,
             };

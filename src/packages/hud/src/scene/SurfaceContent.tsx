@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import type { Approval, IslandEvent, Snapshot } from "@agent-hud/protocol";
-import { snapshotLanguage } from "@agent-hud/ui/format";
 import { CompactAlertView } from "../alerts/CompactAlertView";
 import { horizontal, type HUDRect } from "../geometry";
 import {
@@ -59,7 +58,6 @@ export function SurfaceContent({
   request,
   event,
   requests,
-  snapshot,
   forceOpen,
   dismissNews,
   showPanelStats,
@@ -104,7 +102,6 @@ export function SurfaceContent({
             simple={config.mode === "simple"}
             scale={scale}
             light={light}
-            zh={snapshotLanguage(snapshot) === "zh"}
             tuck={peekTuck}
             edge={edge}
           />
@@ -120,7 +117,6 @@ export function SurfaceContent({
           scale={scale}
           light={rowLight}
           botLogos={config.botLogos}
-          zh={snapshotLanguage(snapshot) === "zh"}
           onOpen={() => forceOpen()}
           onDismissAndStats={() => {
             dismissNews();
@@ -129,17 +125,13 @@ export function SurfaceContent({
         />
       ) : (
         <div
-          className={
-            snapshot.connection.platform === "windows"
-              ? "hud-windows-scroll"
-              : undefined
-          }
+          className="hud-bare-scroll"
           style={{
             position: "relative",
             maxHeight: "100%",
+            overflowX: "hidden",
             overflowY: "auto",
-            scrollbarWidth:
-              snapshot.connection.platform === "windows" ? "none" : "thin",
+            scrollbarWidth: "none",
           }}
         >
           <motion.div

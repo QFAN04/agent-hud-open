@@ -3,7 +3,8 @@ import type { CustomPrice } from "./prices-relays.ts";
 
 export type ApprovalWaitMinutes = 1 | 3 | 5 | 10 | 30 | 60;
 export interface PanelBlockLayout {
-  /** `rings` are concentric (年轮) and `segments` split one ring (分段环), one
+  /**
+   * `rings` are concentric (年轮) and `segments` split one ring (分段环), one
    * per account; a layout saved before them says `ring`, read as `rings`. */
   widget?: "bar" | "rings" | "segments" | "ring" | "number" | "chart";
   hidden?: boolean;
@@ -123,4 +124,16 @@ export interface AppSettings {
   claudeMessages?: boolean;
   /** Messages may go into DeepSeek Harness sessions through Agent HUD's plugin; on unless turned off. */
   deepseekMessages?: boolean;
+  guide?: GuideRecord;
+}
+/** What the guide knows of this copy, kept by the Settings window and the HUD. */
+export interface GuideRecord {
+  /** When this copy first ran with the guide; 0 for a copy older than it. */
+  since: number;
+  /** The last version whose guide was finished or closed; "" for none. */
+  seen: string;
+  /** The first-run step on screen; "" when no tour is open. */
+  step: string;
+  /** "done" once the Star invitation was taken or closed. */
+  star: string;
 }

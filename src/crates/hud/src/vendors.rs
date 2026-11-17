@@ -78,25 +78,33 @@ fn deepseek_balances<'a>(snapshot: &'a Value, layout: &Value) -> (Option<String>
     (balance, level)
 }
 
+/// Whether a window's reset has passed: its share has started over, so its
+/// reading no longer says how much is used until the next read (Open #90;
+/// held-reading.ts `resetPassed`).
+fn reset_passed(q: &Value, now_ms: i64) -> bool {
+    q["resetAt"]
+        .as_str()
+        .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+        .is_some_and(|at| at.timestamp_millis() <= now_ms)
+}
+
+/// A window that reads live now: a number from the last read, and a reset
+/// still ahead (held-reading.ts `liveWindow`).
+fn live(q: &Value, now_ms: i64) -> bool {
+    q["usedPercent"].is_number() && q["status"] != "stale" && !reset_passed(q, now_ms)
+}
+
 /// The tightest window of an agent's last reading while every window waits
 /// on a failed read ("stale"), so a Simple mark keeps showing it in the stale
 /// grey. A window whose reset has passed holds nothing, since its share has
 /// started over. None while any window reads live (held-reading.ts `heldUsed`).
 fn held(quotas: &[&Value], now_ms: i64) -> Option<f64> {
-    if quotas
-        .iter()
-        .any(|q| q["usedPercent"].is_number() && q["status"] != "stale")
-    {
+    if quotas.iter().any(|q| live(q, now_ms)) {
         return None;
     }
     quotas
         .iter()
-        .filter(|q| {
-            q["resetAt"]
-                .as_str()
-                .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
-                .is_none_or(|at| at.timestamp_millis() > now_ms)
-        })
+        .filter(|q| !reset_passed(q, now_ms))
         .filter_map(|q| q["usedPercent"].as_f64())
         .fold(None, |most: Option<f64>, used| {
             Some(most.map_or(used, |most| most.max(used)))
@@ -116,7 +124,7 @@ pub fn vendors<'a>(snapshot: &'a Value, mode: &str, now_ms: i64) -> Vec<Vendor<'
             // The first of equal readings stays the tightest.
             let tightest = quotas
                 .iter()
-                .filter(|q| q["status"] != "stale")
+                .filter(|q| live(q, now_ms))
                 .filter_map(|q| Some((q["usedPercent"].as_f64()?, *q)))
                 .fold(None::<(f64, &Value)>, |best, (used, q)| match best {
                     Some((most, _)) if used <= most => best,
@@ -235,17 +243,22 @@ fn vendor_name(source: &str) -> String {
         "hermes" => "Hermes",
         "zcode" => "ZCode",
         "codebuddy" => "CodeBuddy",
+        "codebuddy-cn" => "CodeBuddy CN",
         "workbuddy" => "WorkBuddy",
         "qwen" => "Qwen",
         "qoder" => "Qoder",
+        "qoder-cn" => "Qoder CN",
+        "qoder-work" => "QoderWork",
         "devin" => "Devin",
         "minimax" => "MiniMax",
+        "minimax-code" => "MiniMax Code",
         "ark" => "Volcengine Ark",
         "droid" => "Factory Droid",
         "cline" => "Cline",
         "roo-code" => "Roo Code",
         "goose" => "Goose",
         "trae" => "TRAE",
+        "trae-cn" => "TRAE CN",
         // Agents with no mark of their own here, by their own names.
         _ => agent_hud_core::naming::model_names::vendor_name(source),
     };

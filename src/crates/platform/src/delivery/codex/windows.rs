@@ -8,6 +8,9 @@ use serde_json::{json, Value};
 
 /// Agent HUD sends to Codex on this host.
 pub(crate) const SUPPORTED: bool = true;
+/// A new thread's first message goes through Codex's queue here, which the
+/// app that opens the thread runs in its own model: none can be named.
+pub(crate) const MODEL_AT_START: bool = false;
 /// What a send may ask for: start, steer, and interrupt through the desktop
 /// app, and Codex's queue.
 pub(crate) const OPERATIONS: &[Operation] = &[

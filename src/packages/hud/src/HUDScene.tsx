@@ -10,8 +10,8 @@ import { useReducedMotion } from "motion/react";
 import type { Snapshot } from "@agent-hud/protocol";
 export { HUDArtwork as HUDLogo } from "./HUDArtwork";
 import { DockMemory, type Direction } from "./bots/mark-director";
-import { AlertStack } from "./scene/AlertStack";
 import { HUDExpandedSurface } from "./scene/HUDExpandedSurface";
+import { HUDInstructions } from "./scene/HUDInstructions";
 import { HUDMarkStrip } from "./scene/HUDMarkStrip";
 import { FlightLayer } from "./scene/FlightLayer";
 import type { HUDFlightCommand } from "./scene/flight-queue";
@@ -32,7 +32,7 @@ import { useHeldFrame } from "./scene/useHeldFrame";
 import { MeasuringCopy, useMeasured } from "./scene/MeasuringCopy";
 import { DockEnds } from "./ends/DockEnds";
 import { useDockEnds } from "./ends/useDockEnds";
-import { PanelBody } from "./scene/PanelBody";
+import { useScenePanelBody } from "./scene/useScenePanelBody";
 import { RestingStrip } from "./scene/RestingStrip";
 import { HoverFloor, SceneBackdrop } from "./scene/SceneFloors";
 import { usePanelHandoffs } from "./scene/usePanelHandoffs";
@@ -40,8 +40,9 @@ import { useSceneAlerts } from "./scene/useSceneAlerts";
 import { compactStripMetrics } from "./scene/edge-retract";
 import { useEdgeRetract } from "./scene/useEdgeRetract";
 import { usePanelCommand } from "./scene/usePanelCommand";
-import { useSceneViewport } from "./scene/useSceneViewport";
 import { useStripMetrics } from "./scene/useStripMetrics";
+import { useSceneWidth, useSystemLight } from "./scene/useSceneMeasures";
+import { GuideDock, type HUDGuide } from "./GuideDock";
 import { usePanelServices } from "./PanelContext";
 import type { HUDRect } from "./geometry";
 import { useHoverMachine } from "./hover";
@@ -54,7 +55,6 @@ import {
   type HUDDecision,
   type HUDUpdateNotice,
 } from "./model";
-import { snapshotLanguage } from "@agent-hud/ui/format";
 import {
   ListedSessionsContext,
   type StatsTarget,
@@ -111,6 +111,8 @@ export interface HUDSceneProps {
   panelCommand?: { open: boolean; sequence: number };
   /** The host's recent flights between two agents' marks, oldest first. */
   flights?: readonly HUDFlightCommand[];
+  /** The guide's small window beside the resting HUD (GuideDock). */
+  guide?: HUDGuide | null;
 }
 
 /**
@@ -141,6 +143,7 @@ export function HUDScene({
   renderBackdrop,
   panelCommand,
   flights,
+  guide,
 }: HUDSceneProps) {
   const sourceConfig = useMemo(
     () => ({ ...defaultHUDConfig, ...supplied }),
@@ -158,10 +161,11 @@ export function HUDScene({
   const id = useId().replaceAll(":", "");
   const scene = useRef<HTMLElement>(null);
   const dockMemory = useRef(new DockMemory());
-  const { width, systemLight } = useSceneViewport(scene);
+  const width = useSceneWidth(scene);
   const [contentHeight, setContentHeight] = useState<number>(
     HUD_METRICS.defaultPanelHeight,
   );
+  const systemLight = useSystemLight();
   const [hovered, setHovered] = useState<string | null>(null);
   const [pinned, setPinned] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
@@ -394,43 +398,32 @@ export function HUDScene({
     showPanelStats,
     onUpdate,
   });
-  const eventContent =
-    request || event ? (
-      <AlertStack
-        requests={requests}
-        request={request}
-        event={event}
-        news={news}
-        decide={onRequestDecision}
-        openSettings={openSettings}
-        onStats={showPanelStats}
-        handoff={handoff}
-        light={light}
-        snapshot={snapshot}
-        botLogos={config.botLogos}
-      />
-    ) : null;
-
-  // The panel's body, drawn by the visible panel and by the hidden copy
-  // below, which measures its natural height (no `maxHeight`) over the
-  // snapshot it last drew.
-  const panelBody = (shown: Snapshot, maxHeight?: number) => (
-    <PanelBody
-      snapshot={shown}
-      maxHeight={maxHeight}
-      alertStack={eventContent}
-      inUsagePanel={inUsagePanel}
-      event={event}
-      open={open}
-      config={config}
-      focusVendor={focusedVendor?.name}
-      light={light}
-      footer={footer}
-      update={update}
-      dismissNews={news.dismiss}
-      delivery={delivery}
-    />
-  );
+  const panelBody = useScenePanelBody({
+    hasAlert: Boolean(request || event),
+    alertArgs: {
+      requests,
+      request,
+      event,
+      news,
+      decide: onRequestDecision,
+      openSettings,
+      onStats: showPanelStats,
+      handoff,
+      light,
+      snapshot,
+      botLogos: config.botLogos,
+    },
+    inUsagePanel: Boolean(inUsagePanel),
+    event,
+    open,
+    config,
+    focusVendor: focusedVendor?.name,
+    light,
+    footer,
+    update,
+    dismissNews: news.dismiss,
+    delivery,
+  });
   // The hidden copy measures the panel for its next opening, as the native
   // hosting view measured its fitting size. A pointer move never draws it
   // again, and at rest (collapsed, no card out, the pointer away) neither does
@@ -470,6 +463,7 @@ export function HUDScene({
           data-mode={config.mode}
           data-edge={edge}
           data-hover={state.phase}
+          data-open={open}
           data-pinned={pinned}
           data-appearance={light ? "light" : "dark"}
           aria-label={`Agent HUD ${config.mode === "notch" ? "Classic" : "Simple"} preview`}
@@ -637,11 +631,17 @@ export function HUDScene({
             reduceMotion={reduceMotion}
             light={light}
           />
-          <span id={`hud-instructions-${id}`} className="sr-only">
-            {snapshotLanguage(snapshot) === "zh"
-              ? "悬停展开。在分开显示的模式下，点按一个智能体打开它的完整面板。"
-              : "Hover to expand. In separated agent mode, click an agent to open its full panel."}
-          </span>
+          <GuideDock
+            guide={guide}
+            open={open}
+            hidden={Boolean(dragVisual) || cardVisible}
+            edge={edge}
+            strip={strip}
+            screen={screen}
+            light={light}
+            reduceMotion={reduceMotion}
+          />
+          <HUDInstructions id={`hud-instructions-${id}`} />
         </section>
       </ListedSessionsContext.Provider>
     </HUDGroundProvider>

@@ -73,7 +73,9 @@ pub fn run_with_options(
             std::process::exit(2);
         }
     };
-    agent_hud_runtime::l10n::set_system_chinese(shell::system_prefers_chinese());
+    agent_hud_runtime::l10n::set_system_languages(&shell::system_languages());
+    // The system's language until the stored settings are read.
+    agent_hud_runtime::l10n::follow(&serde_json::Value::Null);
     let instance = if demo {
         None
     } else {
@@ -116,6 +118,7 @@ pub fn run_with_options(
                 hud::hud_monitors,
                 hud::hud_geometry,
                 hud::hud_report_regions,
+                hud::hud_set_depth,
                 hud::hud_drag_start,
                 hud::hud_text_focus,
                 auxiliary::hud_show_main,
@@ -142,6 +145,12 @@ pub fn run_with_options(
             }
         })
         .setup(move |app| {
+            // Hear about the system's shutdown before any background reading
+            // starts. Without it the app still runs; helpers just are not held
+            // back while Windows ends the session.
+            if let Err(error) = shell::prepare(app.handle()) {
+                eprintln!("Agent HUD session-end monitor: {error}");
+            }
             app.manage(system::System::new(app.config().identifier.clone()));
             app.manage(mcp_clients::Clients::default());
             app.manage(claude_plugin::ClaudePlugin::new(

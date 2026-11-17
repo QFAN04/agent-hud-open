@@ -19,11 +19,12 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#文档">文档</a>
+  <a href="README.md">English</a> · <strong>简体中文</strong> · <a href="https://agenthud.app">官网</a> · <a href="https://discord.gg/cpTPDgWwXR">Discord</a> · <a href="#社区">微信群</a> · <a href="#支持的-agent">支持的 agent</a> · <a href="#文档">文档</a>
 </p>
 
 <p align="center">
-  <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="640">
+  <img src="docs/videos/agent-hud-loop.zh-CN.webp" alt="灵动岛上的 Agent HUD 演示。光晕呼吸着红、黄、绿的额度色段；悬停后面板展开，显示 Claude 与 Codex 的额度、DeepSeek 的余额、过去 24 小时的 Token 与会话，点击后 Claude 的额度切换为消耗速率。随后 Claude 请求运行测试，用「批准一次」回应；它的回复以「有新回复」提醒出现，卡片上有「回到会话」" width="450"> <img src="docs/videos/simple-mode-tour.zh-CN.webp" alt="简约形态停靠在屏幕左侧的一段演示。五个 agent 图标外是额度圆环，随后显示百分比与余额。悬停在图标上，用一行写出该 agent 的额度；点击后展开 Claude 的卡片，显示额度、消耗速率与 24 小时的 Token 柱。接着用 Allow once 回应一个批准请求，展开一条 New reply 提醒及其 Return to session 按钮，最后把 HUD 拖到屏幕顶部再拖回" width="380"><br>
+  <sub>左：MacBook 刘海处的刘海形态 · 右：停靠在屏幕左侧的简约形态，已开启「按 agent 分开」 · 示例数据</sub>
 </p>
 
 <p align="center">如果 Agent HUD 对你有用，点个 Star，能让更多人找到它。</p>
@@ -46,16 +47,13 @@ npx @agenthud/install
 
 也可以直接下载[发行版](https://agenthud.app/mac)。两条命令都会安装最新的版本（包括 Beta），在 Mac 上之后 Agent HUD 会自己更新。`/Applications` 里已经装了的话，给 Homebrew 命令加上 `--adopt`。
 
+初次使用？先看[如何让 agents 互发消息](https://agenthud.app/docs/zh/mcp/messaging/)和[各平台支持情况](docs/platforms.md)。
+
 ## 在屏幕上
 
 **你的 agents，一目了然。** 你在写代码、读文档或处理别的事情，agents 继续工作。屏幕边缘告诉你：谁还在忙，谁已经完成，谁正在等你。
 
 细节就在手边，需要你批准的事情也在这里回应。多个 agent 的进展，集中在一眼可见的地方。
-
-<p align="center">
-  <img src="docs/videos/simple-mode-tour.zh-CN.webp" alt="简约形态停靠在屏幕左侧的一段演示。五个 agent 图标外是额度圆环，随后显示百分比与余额。悬停在图标上，用一行写出该 agent 的额度；点击后展开 Claude 的卡片，显示额度、消耗速率与 24 小时的 Token 柱。接着用 Allow once 回应一个批准请求，展开一条 New reply 提醒及其 Return to session 按钮，最后把 HUD 拖到屏幕顶部再拖回" width="640"><br>
-  <sub>停靠在屏幕左侧的简约形态，已开启「按 agent 分开」 · 示例数据</sub>
-</p>
 
 - **光晕**：每个 agent 一种颜色，按它用量最高的那项额度：已用不足 70% 为绿色，达到 70% 为黄色，达到 90% 为红色；额度耗尽前会提醒你。有 agent 在工作时，光晕动得更快。
 - **悬停**：额度及其重置时间或消耗速率、余额、过去 24 小时的 Token，以及会话，等你处理的排在最前。
@@ -68,6 +66,8 @@ npx @agenthud/install
 | --- | --- |
 | **刘&#8288;海** | 在刘海处，周围是光晕。 |
 | **简&#8288;约** | 停靠在任意屏幕边缘的小型悬浮面板：每个 agent 的图标外套一个圆环，画的是它用量最高的那项额度，旁边写着百分比。agent 工作时，它的图标会变成 Bot。 |
+
+每块屏幕还可以不显示 HUD，或只隐去消息、交互请求或纸飞机：设置 → 显示。
 
 ## 在手机上
 
@@ -106,8 +106,9 @@ Claude Code 写完一段改动，可以请一个 Codex 会话审一遍，Codex �
 谁在跟谁说话，HUD 上看得见：发信的 agent 把信折成纸飞机，飞到收信的 agent 那里，回答再沿原路飞回来。
 
 - **只传消息，不交出会话**：过去的只有 agent 写下的那条消息，会话本身留在原处。同一个项目里，项目本身就成了它们共同的上下文，对方自己去读代码。
-- **Claude Code、Codex、Antigravity 与 DeepSeek Harness**：彼此都能传话，也能新开 Claude Code、Codex 或 Antigravity 会话。
-- **不打断工作**：消息等对方空闲才送达，不会插进正在进行的一轮。
+- **十二款 agent**：Claude Code、Codex、Antigravity、DeepSeek Harness、Cursor、TRAE、WorkBuddy、ZCode、Qoder、Kimi Code、Pi 与 OpenCode 彼此都能传话，也能新开 Claude Code、Codex、Antigravity 或 DeepSeek Harness 会话。
+- **不打断工作**：消息等对方空闲才送达。只有你明确要求时，agent 才会把消息插进 Codex 会话正在进行的一轮。
+- **六款受限**：Cursor、TRAE、WorkBuddy、ZCode、Qoder 与 Kimi Code 只在它们的一轮结束时接收，空闲的会话要等你在那里再发起一轮才收得到。除 WorkBuddy 外，一轮里连续接收的次数也有上限。
 
 怎样开启和使用，见[使用文档](https://agenthud.app/docs/zh/mcp/messaging/)。
 
@@ -183,8 +184,8 @@ Agent HUD 基于 Tauri 2 构建：Rust 核心、React 界面，每个操作系�
 
 - **一套核心。** 读取 agent 的记录、统计 Token、计算额度、价格与会话，都只在 Rust 里做一次，每个系统的结果完全一致。窗口只负责显示核心算好的内容。
 - **每个系统各有自己的文件。** 路径、进程、凭据、回调与窗口，每个系统各写一份；改进 Windows 或 Linux，不会碰到共享代码。
-- **macOS 已可用，Windows 与 Linux 处于预览。** 两者都能从本仓库源码构建，但尚未在真机上验证；还缺的部分见[即将推出](#即将推出)。
-- **iPhone 与 Apple Watch 与 Mac 配对。** Agent HUD Remote 经由 iCloud 同步，因此只在 macOS 上提供。
+- **macOS 已可用，Windows 与 Linux 处于预览。** 两者都能从本仓库源码构建，每次发布也附带未签名的测试安装包。Linux 版尚未在真机桌面上试过；还缺的部分见[即将推出](#即将推出)。
+- **iPhone 与 Apple Watch 可与 Mac 或 Windows 电脑配对。** Agent HUD Remote 经由 iCloud 同步，所以暂时只在 macOS 上提供；配对 Windows 电脑时，手机在同一局域网内连接。
 
 ## Agent HUD Remote
 
@@ -219,7 +220,7 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 ## 即将推出
 
-- **Windows 与 Linux 结束预览**：Windows 上的客户端回调。[欢迎参与](CONTRIBUTING.md)。
+- **Windows 与 Linux 结束预览。** [欢迎参与](CONTRIBUTING.md)。
 - **支持更多 agent**，不止下面表格里的 27 款。
 - **按 Token 计费的 API**：用 API 密钥付费的账户，也能看到用量、花费与余额，和订阅的额度放在一起。
 - **UI 提示词模板。** 现成的提示词，一次就把 HUD 改成你想要的样子。
@@ -239,37 +240,39 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
 
 安装并登录想要关注的 agent，Agent HUD 会自动发现它们。
 
-| Agent | Token 与会话 | 额度 | 实时状态 | 批准 | 提问 | 回复 | 回到会话 | 轮次与调用 |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ |
-| **Antigravity** | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |
-| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
-| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Grok&nbsp;Bot** | ✓ | ✓ |  |  |  |  | ✓ |  |
-| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
-| **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  |
-| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
-| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |
-| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |
-| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |
-| **OpenClaw** | ✓ |  |  |  |  |  |  |  |
-| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |
-| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |
-| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  |
-| **Qoder** | ✓ | ✓ |  | ✓ |  |  |  |  |
-| **ZCode** | ✓ |  |  | ✓ | ✓ |  |  |  |
-| **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **WorkBuddy** | ✓ | ✓ |  | ✓ |  |  |  |  |
-| **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |
-| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ |  |  |
-| **Cline** | ✓ | ✓ |  |  |  |  |  |  |
-| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |
-| **Goose** | ✓ |  |  |  |  |  |  |  |
+| Agent | Token 与会话 | 额度 | 实时状态 | 批准 | 提问 | 回复 | 回到会话 | 轮次与调用 | 互发消息 |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Claude&nbsp;Code** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Codex** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **DeepSeek&nbsp;Harness** | ✓ | 余额 | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |
+| **Antigravity** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Cursor** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | 受限 |
+| **Grok&nbsp;CLI** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
+| **Grok&nbsp;Bot** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  |  |
+| **GitHub&nbsp;Copilot&nbsp;CLI** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
+| **OpenCode** | ✓ | ✓ |  |  |  | ✓ | ✓ |  | ✓ |
+| **Kilo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
+| **MiMo&nbsp;Code** | ✓ |  |  |  |  | ✓ | ✓ |  |  |
+| **Kimi** | ✓ | ✓ | ✓ |  |  | ✓ |  |  | 受限 |
+| **Pi** | ✓ | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| **Oh&nbsp;My&nbsp;Pi** | ✓ |  | ✓ |  |  | ✓ | ✓ |  |  |
+| **OpenClaw** | ✓ |  |  |  |  |  |  |  |  |
+| **Hermes&nbsp;Agent** | ✓ | ✓ | ✓ |  |  | ✓ |  |  |  |
+| **Factory&nbsp;Droid** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
+| **TRAE** | 会话 | ✓ | ✓ |  |  | ✓ |  |  | 受限 |
+| **Qoder** | ✓ | ✓ | ✓ | ✓ |  | ✓ |  | ✓ | 受限 |
+| **ZCode** | ✓ |  | ✓ | ✓ | ✓ | ✓ |  |  | 受限 |
+| **CodeBuddy** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
+| **WorkBuddy** | ✓ | ✓ |  | ✓ |  | ✓ |  |  | 受限 |
+| **Qwen&nbsp;Code** | ✓ |  |  | ✓ |  | ✓ |  |  |  |
+| **Devin** | ✓ | ✓ |  | ✓ |  | ✓ | ✓ |  |  |
+| **Cline** | ✓ | ✓ |  |  |  |  |  |  |  |
+| **Roo&nbsp;Code** | ✓ |  |  |  |  |  |  |  |  |
+| **Goose** | ✓ |  |  |  |  |  |  |  |  |
 
-另外还读取 **GLM Coding Plan**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex 的批准需先在 Codex 中信任回调，DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
+互发消息标着**受限**的，消息只在这一轮结束时送到：空闲的会话收不到，要等你在那里再发起一轮。
+
+另外还读取 **GLM Coding Plan**、**OpenCode Go**、**MiniMax** 与 **火山方舟** 的套餐额度。Qoder 包括 Qoder CN 与 QoderWork，TRAE 包括 TRAE CN，Devin 包括 CLI 与 Devin Desktop。Codex CLI 的批准需先在 Codex 中信任回调（Codex 桌面版不需要），DeepSeek Harness 的批准和提问需先安装 Agent HUD 插件（设置 → 智能体插件），Copilot 的批准与额度分别在设置中打开。Qoder、WorkBuddy 与 TRAE 的额度需先在 Agent HUD 自己的窗口里登录厂商网站。TRAE 不提供 Token，只显示会话；打开它的全局 Hooks 后才会运行 Agent HUD 的回调。Qoder 只在使用你自己密钥的模型、或设置了 `QODER_EXPOSE_TOKEN_USAGE` 时记录 Token，逐轮明细也随之才有。一键回到终端窗格需要 iTerm2；Cursor 能回到云端 agent 的对话，本地对话只能打开它的文件夹。[互发消息](https://agenthud.app/docs/zh/mcp/messaging/)标为「受限」的 agent 只在自己的一轮结束时收消息，空闲时收不到，也不能被新开会话；只有交互式的 Qoder CLI 会话空闲时也收得到。互发消息支持 OpenCode 1；Qoder CN 与 QoderWork 只收不发。Factory Droid 的额度需要 Factory API Key，Devin 的额度来自其 CLI 的本机缓存。Cursor 的 Token 需要 Cursor 3.27 或更新版本。Grok Bot 的 Bot 运行在 Cursor 的服务器上，由服务器给出每个 Bot 每天的 Token；已合并到 SuperGrok 的账户没有这项数据，只显示会话。Cursor 与 Grok Bot 登录同一账户时，Grok Bot 的周额度也从这些服务器读取；否则读取 Bot 自己的缓存，而 Bot 只在使用时刷新它。已合并到 SuperGrok 的账户由 Cursor 和 Grok Bot 共用一个周额度，Cursor 一栏按 Cursor 自己的显示读取它。
 
 ## 保护你的数据
 
@@ -281,6 +284,16 @@ iPhone 和发行版在同一个网络里，不订阅也能在 iPhone 与 Apple W
   - **同一局域网内**走 HTTPS，手机配对时固定这台 Mac 的证书。
   - **任何网络下，借助 Agent HUD Remote**，经由你自己的 iCloud。记录正文端到端加密，密钥在你的 iCloud 钥匙串里；只有提醒要显示的文字不在加密范围内，以便系统弹出提醒。
   - **运行中会话的实时活动**同样需要 Remote，经 Agent HUD 的中转服务交给 Apple 的推送服务。中转只保留转发所需的内容，即每台 Mac 最新的会话与每部手机的卡片，不保留账户身份；30 天没有请求的账户会被删除。
+
+## 社区
+
+有问题、想法或 bug，欢迎到 [Discord](https://discord.gg/cpTPDgWwXR)、微信群或 [issues](https://github.com/jazzenchen/agent-hud-open/issues) 找我。
+
+<details>
+<summary><strong>微信群</strong>：用微信扫码加入</summary>
+<p><img src="https://agenthud.app/assets/community/wechat-group.png" alt="Agent HUD 微信交流群二维码" width="220"></p>
+<p>微信群二维码 7 天有效，我每周在官网换上新的，这里会跟着更新。如果已过期，可以先到 Discord 找我。</p>
+</details>
 
 ## 从源码构建
 

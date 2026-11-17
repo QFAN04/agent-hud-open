@@ -46,7 +46,7 @@ fn powershell_parent_processes() -> Vec<ProcessAncestor> {
     command
         .env("AGENT_HUD_ANCESTRY_DIAGNOSTICS", "1")
         .stderr(Stdio::piped());
-    let Ok(mut child) = command.spawn() else {
+    let Ok(mut child) = super::spawn(&mut command) else {
         #[cfg(test)]
         eprintln!(
             "ancestry: spawn failed after {}ms",
@@ -246,12 +246,12 @@ mod tests {
     fn native_argv_preserves_unicode_spaces_empty_values_and_backslashes() {
         assert_eq!(
             arguments(
-                r#""C:\Program Files\Claude\claude.exe" --model "模型 one" "" "C:\my project\\""#
+                r#""C:\Program Files\Claude\claude.exe" --model "模型 one" "" "C:\my project\\""# // l10n-ignore: test data
             ),
             Some(vec![
                 r"C:\Program Files\Claude\claude.exe".into(),
                 "--model".into(),
-                "模型 one".into(),
+                "模型 one".into(), // l10n-ignore: test data
                 "".into(),
                 "C:\\my project\\".into(),
             ])
@@ -266,7 +266,7 @@ mod tests {
         // native ancestry test below covers the complete bounded process read.
         let script = include_str!("../../../scripts/windows/parent-processes.ps1");
         let functions = script.split_once("\ntrap {").unwrap().0;
-        let input = "C:\\用户\\my project\\agent.exe \"quoted\"\r\n\t\u{1}";
+        let input = "C:\\用户\\my project\\agent.exe \"quoted\"\r\n\t\u{1}"; // l10n-ignore: test data
         let system = std::env::var_os("SystemRoot").unwrap();
         let output = Command::new(
             PathBuf::from(system).join("System32/WindowsPowerShell/v1.0/powershell.exe"),

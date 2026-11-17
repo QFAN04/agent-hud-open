@@ -35,6 +35,17 @@ authoritative event exists. Scope membership, ordering and non-running day
 groups use this time. Raw checkpoint timestamps remain separate for ingestion
 and duplicate resolution; this presentation rule does not change token accounting.
 
+Copies of one log (moved to an archive folder, compressed) count once. Codex
+goes on with a conversation in a new rollout when it rewinds the history after
+a stopped turn: `rollout-<time>-<id>_<segment>.jsonl`, with the same
+`session_meta` id and a `history_base` pointing into the rollout before it.
+Every segment's calls count toward the session: its row, its page's tokens,
+breakdown and calls, and Statistics, which ranks it as one session. Lists show
+it once, under its newest segment; its page starts when its first segment did.
+Its messages read on from one segment into the next, as one run of cursors:
+Codex never writes to an earlier segment again, so a cursor taken before the
+split still finds the same line after it.
+
 A session's `client` is the client that drives it, as its log names it
 ("Codex Desktop", "Claude Code IDE extension"). Devin CLI and Devin Desktop's
 Devin Local write one store, `~/.local/share/devin/cli/sessions.db`, which
@@ -116,14 +127,16 @@ a call in more than one place, the best one counts it and the others give way.
 
 ## Forks read with their parents' readers
 
-Kilo Code and MiMo Code keep OpenCode's database, and Oh My Pi keeps Pi's
-logs, each under folders of its own. Each is its own source, with its own
-session ids (`kilo:`, `mimocode:`, `omp:`), read by its parent's reader:
+Kilo Code, MiMo Code and TeleAgent keep OpenCode's database, and Oh My Pi
+keeps Pi's logs, each under folders of its own. Each is its own source, with
+its own session ids (`kilo:`, `mimocode:`, `teleagent:`, `omp:`), read by its
+parent's reader:
 
 | Client | Sessions | Left out |
 | --- | --- | --- |
 | Kilo Code | `$XDG_DATA_HOME/kilo/kilo.db` | Tasks moved in from the VS Code extension (`ses_migrated_*`, no tokens); the JSON files it copied into the database; rows whose data is not JSON |
 | MiMo Code | `$XDG_DATA_HOME/mimocode/mimocode.db` | Messages imported from Claude Code, Codex or OpenCode (`external_import`), which are read where they were made; the made-up title "Untitled" |
+| TeleAgent | `$XDG_DATA_HOME/TeleAgent/users/<account>/teleagent.db`, one per signed-in account | Nothing of its own; it loads no OpenCode plugin, so its sessions show tokens without live state |
 | Oh My Pi | `~/.omp/agent/sessions` | Entries a moved or forked session copied from the one it continues (older than its header); the copies `omp gc --compress` stages in `.omp-gc-compress-*`; calls outside the conversation (`model_usage`) count, without changing the session's model |
 
 Not read: Kilo Code's and MiMo Code's release-channel databases

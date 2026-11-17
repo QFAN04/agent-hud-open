@@ -1,6 +1,8 @@
 //! Starting new sessions from the phone, the HUD or an MCP caller: the
 //! folders each client offers, one start per request identity, and moving a
 //! Claude Code background job into the desktop app once its turn stopped.
+//! DeepSeek Harness has no command that starts a session: Agent HUD's plugin
+//! in a running Harness host makes it (`delivery::deepseek`).
 use super::process::{NativeProcessRunner, ProcessRunner};
 use super::*;
 use serde_json::Value;
@@ -67,6 +69,10 @@ pub struct StartRequest {
     /// The new Codex thread's name; its first line of text when not given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// The model the new session runs, as `list_models` names it; none
+    /// leaves it to the client's own choice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -107,6 +113,9 @@ pub struct SessionStarts {
     runner: Arc<dyn ProcessRunner>,
     /// Where desktop apps are installed: `/Applications` and `~/Applications`.
     applications: Vec<PathBuf>,
+    /// The folder Agent HUD's DeepSeek Harness plugin shares with the app;
+    /// none, and no Harness session is offered or started.
+    deepseek: Option<DeepSeekChannel>,
 }
 impl SessionStarts {
     pub fn new(config: StartConfig, receipts: PathBuf) -> Result<Self> {
@@ -135,6 +144,22 @@ impl SessionStarts {
             offers: Vec::new(),
             runner,
             applications,
+            deepseek: None,
+        })
+    }
+    /// Harness sessions start through Agent HUD's plugin and the folder it
+    /// shares with the app (`LocalClients::deepseek_channel`).
+    pub fn with_deepseek_channel(mut self, channel: Option<DeepSeekChannel>) -> Self {
+        self.deepseek = channel;
+        self
+    }
+    /// Whether a Harness session can start now: the plugin is installed, and
+    /// a Harness host runs it or the Desktop app is there to open.
+    pub(super) fn starts_deepseek(&self) -> bool {
+        self.deepseek.as_ref().is_some_and(|channel| {
+            channel.installed()
+                && (channel.hosted(std::time::SystemTime::now())
+                    || self.desktop(Provider::DeepSeek))
         })
     }
     /// Tests look for desktop apps in fixture folders instead of this computer's.
@@ -191,8 +216,17 @@ impl SessionStarts {
                 ],
                 &["OpenAI.Codex_", "OpenAI.ChatGPT"],
             ),
-            Provider::DeepSeek
-            | Provider::Cursor
+            Provider::DeepSeek => has_desktop_app(
+                &self.applications,
+                &["DeepSeek Harness.app"],
+                &[
+                    "DeepSeek Harness.exe",
+                    "deepseek-harness.exe",
+                    "DeepSeek/DeepSeek.exe",
+                ],
+                &["DeepSeek", "deepseek"],
+            ),
+            Provider::Cursor
             | Provider::Trae
             | Provider::WorkBuddy
             | Provider::ZCode

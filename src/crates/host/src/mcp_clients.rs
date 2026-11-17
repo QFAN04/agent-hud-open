@@ -1,16 +1,17 @@
 //! HUD tools in each agent client, only after an explicit Settings action:
 //! Agent HUD's MCP server, added with the client's own command where it has
 //! one and in its settings file where it does not, and the skill that
-//! teaches the agent to use it. At launch, the skill of every client that
-//! has the server is brought up to date. A marked DeepSeek Harness server and
-//! an unambiguously broken file-managed server follow the fixed installed
-//! executable, so moving or reinstalling the app cannot leave a stale path.
+//! teaches the agent to use it. At launch, every client that has the server
+//! is pointed at this copy again and its skill brought up to date. A marked
+//! DeepSeek Harness server and an unambiguously broken file-managed server
+//! follow the fixed installed executable, so moving or reinstalling the app
+//! cannot leave a stale path.
 use crate::client_cli::{executable, run_client};
 use agent_hud_runtime::hud_tools::{Client, Places, SkillState, CLIENTS};
+use agent_hud_runtime::l10n::tr;
 use serde_json::{json, Value};
 use std::{
-    fs,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Mutex, PoisonError},
     time::Duration,
 };
@@ -26,6 +27,8 @@ mod unix;
 #[cfg(not(windows))]
 use unix as host;
 
+#[path = "mcp_clients/entry.rs"]
+mod entry;
 #[derive(Default)]
 pub struct Clients(Mutex<()>);
 fn client(id: &str) -> Result<Client, String> {
@@ -33,41 +36,25 @@ fn client(id: &str) -> Result<Client, String> {
 }
 /// Whether the client lists Agent HUD's server.
 fn installed(client: Client, places: &Places) -> bool {
-    let path = match client {
-        Client::ClaudeCode => std::env::var_os("CLAUDE_CONFIG_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| places.home.clone())
-            .join(".claude.json"),
-        Client::Codex => std::env::var_os("CODEX_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| places.home.join(".codex"))
-            .join("config.toml"),
-        _ => return client.listed(places),
-    };
-    let Ok(meta) = fs::metadata(&path) else {
-        return false;
-    };
-    if meta.len() > 4 * 1024 * 1024 {
-        return false;
+    match client {
+        Client::ClaudeCode | Client::Codex => entry::listed(client, places).is_some(),
+        _ => client.listed(places),
     }
-    let Ok(text) = fs::read_to_string(path) else {
-        return false;
-    };
-    if client == Client::ClaudeCode {
-        serde_json::from_str::<Value>(&text)
-            .ok()
-            .and_then(|v| v["mcpServers"].get("agent-hud").cloned())
-            .is_some()
-    } else {
-        toml::from_str::<toml::Value>(&text)
-            .ok()
-            .and_then(|v| {
-                v.get("mcp_servers")
-                    .and_then(|v| v.get("agent-hud"))
-                    .cloned()
-            })
-            .is_some()
+}
+/// Adds the server again with the client's own command line, so it starts
+/// `path`: removed first, so the add never meets an entry of that name.
+fn repoint(client: Client, places: &Places, path: &std::path::Path) -> Result<(), String> {
+    let executable = executable(client.id(), &places.home)
+        .ok_or("the client's command line is not installed")?;
+    for install in [false, true] {
+        run_client(
+            &executable,
+            &args(client, install, path),
+            &places.home,
+            Duration::from_secs(15),
+        )?;
     }
+    Ok(())
 }
 /// Refresh a server only when Agent HUD can prove that its ownership or
 /// failure is safe to establish. This never adds a server.
@@ -128,15 +115,12 @@ fn status(app: &tauri::AppHandle) -> Result<Value, String> {
         let copy = running
             .map(|path| path.display().to_string())
             .unwrap_or_default();
-        Some(agent_hud_runtime::l10n::text(
-            &format!("只有安装好的 Agent HUD 才能添加 HUD 工具，这一份在 {copy}。"),
-            &format!("Only the installed Agent HUD can add HUD tools; this copy is at {copy}."),
+        Some(tr!(
+            "Only the installed Agent HUD can add HUD tools; this copy is at {{copy}}.",
+            copy = copy
         ))
     } else if !complete {
-        Some(agent_hud_runtime::l10n::text(
-            "这一份 Agent HUD 缺少 MCP 组件。",
-            "This copy of Agent HUD is missing its MCP components.",
-        ))
+        Some(tr!("This copy of Agent HUD is missing its MCP components."))
     } else {
         None
     };
@@ -215,10 +199,12 @@ fn run(app: &tauri::AppHandle, id: &str, install: bool) -> Result<Value, String>
     }
     status(app)
 }
-/// At launch: brings the skill up to date in every client that lists Agent
-/// HUD's server, adding it where an older version added only the server. A
-/// safely identifiable existing server also follows the fixed installed
-/// executable after a move or reinstall. Neither action adds a server.
+/// At launch, in every client that lists Agent HUD's server: points the
+/// server at this copy when it names another (a copy that moved, Open #100),
+/// and brings the skill up to date, adding it where an older version added
+/// only the server. A safely identifiable existing server also follows the
+/// fixed installed executable after a move or reinstall. Neither action adds
+/// a server, and each only logs a failure.
 pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
     // The demo leaves the user's clients alone.
     if app.state::<super::AppState>().demo {
@@ -241,11 +227,22 @@ pub(crate) fn repair_on_launch(app: &tauri::AppHandle) {
                 continue;
             }
             if let Some(path) = canonical.as_deref() {
-                if let Err(error) = repair_server_path(client, &places, path) {
-                    eprintln!(
-                        "The Agent HUD MCP path for {} could not be reconciled: {error}",
-                        client.name()
-                    );
+                if client.command().is_none() {
+                    if let Err(error) = repair_server_path(client, &places, path) {
+                        eprintln!(
+                            "The Agent HUD MCP path for {} could not be reconciled: {error}",
+                            client.name()
+                        );
+                    }
+                } else if entry::listed(client, &places)
+                    .is_some_and(|entry| entry.points_elsewhere(path))
+                {
+                    if let Err(error) = repoint(client, &places, path) {
+                        eprintln!(
+                            "Agent HUD's MCP server in {} still starts another copy: {error}",
+                            client.name()
+                        );
+                    }
                 }
             }
             match client.skill_state(&places) {
@@ -292,7 +289,7 @@ pub async fn native_mcp_clients(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::{collections::HashMap, fs};
 
     fn places(root: &Path) -> Places {
         Places::new(

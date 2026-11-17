@@ -1,7 +1,7 @@
 //! The running agy's read-only slash command, as recorded by the native app's
 //! AntigravityCLITests. It reports quota groups but no signed-in identity.
 use crate::account::{account_id, legacy_unresolved, status, EngineStart, Host, Reading};
-use crate::l10n;
+use crate::l10n::tr;
 use crate::naming::{vendor_windows, window_names::Period};
 use chrono::Utc;
 use serde_json::{json, Value};
@@ -12,10 +12,7 @@ use std::{
 };
 
 fn failure() -> String {
-    l10n::text(
-        "agy 正在运行，但读取不到它的额度",
-        "agy is running, but its quota could not be read",
-    )
+    tr!("agy is running, but its quota could not be read")
 }
 
 pub(super) fn read(host: &dyn Host, executable: &Path) -> Result<Reading, String> {
@@ -49,9 +46,9 @@ fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
         return Err(if reason.is_empty() {
             failure()
         } else {
-            l10n::text(
-                &format!("无法读取 Antigravity 额度：{reason}"),
-                &format!("Antigravity quota could not be read: {reason}"),
+            tr!(
+                "Antigravity quota could not be read: {{reason}}",
+                reason = reason
             )
         });
     }
@@ -132,10 +129,7 @@ fn parse(scope: &str, body: &Value) -> Result<Reading, String> {
         }
     }
     if reading.quotas.is_empty() {
-        reading.notice = Some(l10n::text(
-            "agy 未提供额度比例",
-            "agy reports no quota percentage.",
-        ));
+        reading.notice = Some(tr!("agy reports no quota percentage."));
     }
     Ok(reading)
 }
@@ -212,6 +206,17 @@ mod tests {
         body["status"] = json!("SUCCESS");
         body["command"]["name"] = json!("credits");
         assert!(parse("/u", &body).is_err());
+    }
+
+    #[test]
+    fn a_refusal_keeps_the_clis_own_reason() {
+        let refused = json!({"status": "ERROR", "error": " Not eligible in this region. "});
+        let why = parse("/u", &refused).err().unwrap();
+        assert!(why.ends_with("Not eligible in this region."), "{why}");
+        assert_eq!(
+            parse("/u", &json!({"status": "ERROR"})).err(),
+            Some(failure())
+        );
     }
 
     #[test]

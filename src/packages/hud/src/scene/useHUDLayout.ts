@@ -18,11 +18,14 @@ import { useRequestDelivery } from "./request-delivery";
 import {
   bodyMaxHeight,
   expandedPanelHeight,
+  hudGround,
   isSurfaceBordered,
   peekBubbleHeight,
   SURFACE_BORDER_PX,
 } from "./surface-size";
 import { snapshotLanguage } from "@agent-hud/ui/format";
+
+export { hudGround } from "./surface-size";
 
 export interface UseHUDLayoutArgs {
   config: HUDConfig;
@@ -78,17 +81,10 @@ export function useHUDLayout({
   const light =
     config.appearance === "light" ||
     (config.appearance === "system" && systemLight);
-  // Transparency runs the ground from opaque to fully clear. Its outline and
-  // shadow belong to the ground and fade with it; logos, bots and text are
-  // drawn over it at full strength.
-  const surfaceAlpha = 1 - config.solidTransparency;
-  const fill = light
-    ? `rgba(245,245,247,${surfaceAlpha})`
-    : `rgba(0,0,0,${surfaceAlpha})`;
-  const outline = light
-    ? `rgba(0,0,0,${0.106 * surfaceAlpha})`
-    : `rgba(255,255,255,${0.075 * surfaceAlpha})`;
-  const shadow = `0 9px 30px rgba(0,0,0,${0.133 * surfaceAlpha})`;
+  const { fill, outline, shadow } = hudGround(
+    light,
+    1 - config.solidTransparency,
+  );
 
   // The agent the card is for: the sender of the event on show, otherwise the hovered mark. A dock never gives
   // its marks up to an event, so hovering another mark does not move an event's card (ScreenHUD.focus).
@@ -141,7 +137,7 @@ export function useHUDLayout({
       ? peekLineWidth(
           focusedVendor,
           scale,
-          snapshotLanguage(snapshot) === "zh",
+          snapshotLanguage(snapshot),
           peekTuck,
           snapshot.settings.quotaDisplay,
         )
@@ -158,7 +154,7 @@ export function useHUDLayout({
                     event,
                     requestsCount,
                     scale,
-                    snapshotLanguage(snapshot) === "zh",
+                    snapshotLanguage(snapshot),
                   ),
                   screen.width,
                 ),
@@ -228,20 +224,24 @@ export function useHUDLayout({
     reduceMotion || dragging,
   );
 
+  // Cards carry their own padding, so the panel around them keeps less.
+  const carded = config.panelLayout.style?.separators !== false;
+  const side = carded ? 10 : 18;
+  const end = carded ? 10 : 14;
   const bodyPadding = detached
-    ? { top: 14, right: 18, bottom: 14, left: 18 }
+    ? { top: end, right: side, bottom: end, left: side }
     : config.mode === "notch"
       ? {
           top: 32 + (config.hasNotch && light ? 14 : 0),
-          right: 18,
-          bottom: 14,
-          left: 18,
+          right: side,
+          bottom: end,
+          left: side,
         }
       : {
-          top: edge === "top" ? metrics.height + 12 : 14,
-          right: edge === "right" ? metrics.width + 12 : 18,
-          bottom: edge === "bottom" ? metrics.height + 12 : 14,
-          left: edge === "left" ? metrics.width + 12 : 18,
+          top: edge === "top" ? metrics.height + 12 : end,
+          right: edge === "right" ? metrics.width + 12 : side,
+          bottom: edge === "bottom" ? metrics.height + 12 : end,
+          left: edge === "left" ? metrics.width + 12 : side,
         };
   const surfacePadding = {
     top: bodyPadding.top + (flared && !horizontal(edge) ? surfaceFlare : 0),

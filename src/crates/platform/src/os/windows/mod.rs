@@ -1,9 +1,8 @@
 use super::{variable, Environment, ProcessInfo};
 mod acl;
 mod antigravity;
-mod app_targets;
 mod apps;
-mod associations;
+mod claude;
 mod codex;
 mod cookies;
 mod dpapi;
@@ -21,10 +20,9 @@ mod process_win32;
 mod secrets;
 mod shims;
 mod shortcut;
-pub(crate) use apps::{activate_app, app_running, launch_app};
-pub(crate) use associations::{
-    open_folder_in_app, open_session_url, open_url_in_app, registered_bundle, registered_url,
-};
+
+pub(crate) use crate::windows_session::spawn;
+pub(crate) use apps::{activate_app, app_running, launch_app, registered_bundle};
 pub(crate) use engines::{
     application_installed, claude_desktop_bases, discovered_executable, engine_candidates,
     engine_executable, engine_path, executable_dirs,
@@ -87,7 +85,6 @@ pub(crate) fn environment_value<'a>(env: &'a Environment, key: &str) -> Option<&
 pub(super) fn local_app(home: &Path, env: &Environment) -> PathBuf {
     variable(env, "LOCALAPPDATA").unwrap_or_else(|| home.join("AppData/Local"))
 }
-
 pub(super) fn current_env() -> Environment {
     std::env::vars().collect()
 }
@@ -135,6 +132,56 @@ pub(crate) fn listening_ports(pid: u32) -> Result<Vec<u16>, String> {
 }
 pub(crate) fn source_roots(home: &Path) -> Vec<agent_hud_core::SourceRoot> {
     super::portable_cli_roots(home)
+}
+pub(crate) fn registered_url(_url: &str) -> bool {
+    false
+}
+pub(crate) fn open_folder_in_app(_bundle_id: &str, _folder: &std::path::Path) -> bool {
+    false
+}
+pub(crate) fn open_url_in_app(_bundle_id: &str, _url: &str) -> bool {
+    false
+}
+pub(crate) fn open_session_url(url: &str) -> Result<(), String> {
+    if let Some(opened) = apps::open_unregistered_link(url) {
+        return opened;
+    }
+    use std::{
+        ffi::{c_void, OsStr},
+        os::windows::ffi::OsStrExt,
+    };
+    #[link(name = "shell32")]
+    unsafe extern "system" {
+        fn ShellExecuteW(
+            window: *mut c_void,
+            operation: *const u16,
+            file: *const u16,
+            parameters: *const u16,
+            directory: *const u16,
+            show: i32,
+        ) -> *mut c_void;
+    }
+    let operation = "open\0".encode_utf16().collect::<Vec<_>>();
+    let url = OsStr::new(url)
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    if unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            url.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            1,
+        )
+    } as isize
+        > 32
+    {
+        Ok(())
+    } else {
+        Err("The native client could not open this session".into())
+    }
 }
 /// Swift UserDefaults has no native source on this host.
 pub(crate) fn legacy_preferences() -> Option<serde_json::Value> {

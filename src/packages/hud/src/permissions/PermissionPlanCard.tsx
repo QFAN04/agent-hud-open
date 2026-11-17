@@ -1,3 +1,4 @@
+import { useT } from "@agent-hud/ui/format-context";
 import { Fragment, useState } from "react";
 import { ArrowUp, Check, CheckCheck, MessageSquare, X } from "lucide-react";
 import type { Approval, RequestDecision } from "@agent-hud/protocol";
@@ -17,18 +18,14 @@ export function PermissionPlanCard({
   request,
   disabled,
   light = false,
-  zh = false,
-  platform,
   answer,
 }: {
   request: Approval;
   disabled: boolean;
   light?: boolean;
-  zh?: boolean;
-  platform?: string;
   answer: (decision: RequestDecision) => void | Promise<void>;
 }) {
-  const t = (en: string, cn: string) => (zh ? cn : en);
+  const t = useT();
   const saved = planDrafts.get(request.id);
   const [noting, setNotingState] = useState(saved?.noting ?? false);
   const [feedback, setFeedbackState] = useState(saved?.feedback ?? "");
@@ -67,12 +64,12 @@ export function PermissionPlanCard({
     <div style={cardColumn(8)}>
       {(request.plan || request.detail || request.input) && (
         <div
-          aria-label={t("Plan", "计划")}
-          className={platform === "windows" ? "hud-windows-scroll" : undefined}
+          aria-label={t("Plan text")}
+          className="hud-windows-scroll"
           style={{
             maxHeight: 150,
             overflowY: "auto",
-            scrollbarWidth: platform === "windows" ? "none" : undefined,
+            scrollbarWidth: "thin",
             padding: 9,
             borderRadius: 7,
             background: inset,
@@ -127,11 +124,8 @@ export function PermissionPlanCard({
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <input
               type="text"
-              aria-label={t("Plan feedback", "计划反馈")}
-              placeholder={t(
-                "What should change? (optional)",
-                "要改什么（可不填）",
-              )}
+              aria-label={t("Plan feedback")}
+              placeholder={t("What should change? (optional)")}
               value={feedback}
               disabled={disabled}
               onChange={(e) => setFeedback(e.target.value)}
@@ -167,7 +161,7 @@ export function PermissionPlanCard({
               edge={ink(0.18)}
               color={secondary}
             >
-              {t("Back", "返回")}
+              {t("Back")}
             </CardButton>
             <CardButton
               disabled={disabled}
@@ -176,7 +170,7 @@ export function PermissionPlanCard({
               color={onSignal}
             >
               <ArrowUp size={9} strokeWidth={2.6} />
-              {t("Send", "发送")}
+              {t("Send")}
             </CardButton>
           </div>
         ) : (
@@ -188,7 +182,7 @@ export function PermissionPlanCard({
               color={secondary}
             >
               <MessageSquare size={9} strokeWidth={2.6} />
-              {t("Keep planning", "继续规划")}
+              {t("Keep planning")}
             </CardButton>
             <span style={{ flex: 1, minWidth: 8 }} />
             <CardButton
@@ -200,7 +194,7 @@ export function PermissionPlanCard({
               color={allowText}
             >
               <CheckCheck size={9} strokeWidth={2.6} />
-              {t("Approve, accept edits", "批准并自动接受编辑")}
+              {t("Approve, accept edits")}
             </CardButton>
             <CardButton
               disabled={disabled}
@@ -211,17 +205,14 @@ export function PermissionPlanCard({
               color={onAllow}
             >
               <Check size={9} strokeWidth={2.6} />
-              {t("Approve", "批准")}
+              {t("Approve")}
             </CardButton>
           </div>
         )
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 11, color: secondary }}>
-            {t(
-              `Review this plan in ${vendor}`,
-              `请到 ${vendor} 里审批这份计划`,
-            )}
+            {t("Review this plan in {{vendor}}", { vendor })}
           </span>
           <span style={{ flex: 1, minWidth: 8 }} />
           <CardButton
@@ -231,7 +222,7 @@ export function PermissionPlanCard({
             color={secondary}
           >
             <X size={9} strokeWidth={2.6} />
-            {t("Dismiss", "知道了")}
+            {t("Dismiss [acknowledge]")}
           </CardButton>
         </div>
       )}

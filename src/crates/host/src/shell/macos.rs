@@ -5,14 +5,40 @@ use tauri::Manager;
 #[path = "macos_hotkey.rs"]
 mod hotkey;
 
+pub(crate) fn prepare(_app: &tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
 pub(crate) fn install(app: &tauri::AppHandle) {
     hotkey::install(app);
     windows_changed(app);
 }
 
-/// Settings or Statistics was shown: the app joins the Dock and app switcher.
-pub(crate) fn window_opened(app: &tauri::AppHandle) {
-    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+/// Settings, Statistics or a sign-in window is about to show: the app joins
+/// the Dock and app switcher, and the window comes to the desktop in front of
+/// the user. Without this, a window opened on another desktop (Space) takes
+/// the user back to that desktop instead.
+pub(crate) fn window_opened(window: &tauri::WebviewWindow) {
+    let _ = window
+        .app_handle()
+        .set_activation_policy(tauri::ActivationPolicy::Regular);
+    // Queued on the same main-thread channel as the show and focus that
+    // follow, so the window has this behaviour before it is ordered front.
+    let handle = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let Ok(pointer) = handle.ns_window() else {
+            return;
+        };
+        if pointer.is_null() {
+            return;
+        }
+        // The cloned Tauri window keeps the native window alive for this callback.
+        let native = unsafe { &*pointer.cast::<objc2_app_kit::NSWindow>() };
+        native.setCollectionBehavior(
+            native.collectionBehavior()
+                | objc2_app_kit::NSWindowCollectionBehavior::MoveToActiveSpace,
+        );
+    });
 }
 
 /// The app keeps a Dock icon only while Settings, Statistics or a sign-in
@@ -42,10 +68,11 @@ pub(crate) fn statistics_chrome<'a>(
         .hidden_title(true)
 }
 
-pub(crate) fn system_prefers_chinese() -> bool {
+pub(crate) fn system_languages() -> Vec<String> {
     objc2_foundation::NSLocale::preferredLanguages()
-        .firstObject()
-        .is_some_and(|language| language.to_string().starts_with("zh"))
+        .iter()
+        .map(|language| language.to_string())
+        .collect()
 }
 
 /// An app-modal alert from a process that has not started Tauri yet.

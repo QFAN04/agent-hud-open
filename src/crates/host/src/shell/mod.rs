@@ -1,11 +1,11 @@
 //! The application shell's place in the operating system. Each host file
 //! provides the same items, and callers never branch on the operating system:
 //!   install(app)              at launch: global shortcut and initial Dock state
-//!   window_opened(app)        Settings or Statistics was shown
+//!   window_opened(window)     Settings, Statistics or a sign-in window is about to show
 //!   windows_changed(app)      Settings or Statistics was closed or hidden
 //!   reopened(event)           the user asked for the app again (Dock click)
 //!   statistics_chrome(b)      the Statistics window's title bar
-//!   system_prefers_chinese()  the system's language, before any setting is read
+//!   system_languages()       the system's languages, before any setting is read
 //!   alert(title, body, ok)    a blocking message, before the app starts
 #[cfg(target_os = "macos")]
 #[path = "macos.rs"]
@@ -17,6 +17,6 @@ mod host;
 #[path = "linux.rs"]
 mod host;
 pub(crate) use host::{
-    alert, install, reopened, statistics_chrome, system_prefers_chinese, window_opened,
+    alert, install, prepare, reopened, statistics_chrome, system_languages, window_opened,
     windows_changed,
 };

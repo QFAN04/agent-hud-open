@@ -1,6 +1,5 @@
 import { useEffect, type RefObject } from "react";
 import { AnimatePresence } from "motion/react";
-import { useFormat } from "@agent-hud/ui/format-context";
 import type { HUDRect } from "../geometry";
 import type { HUDConfig, HUDEdge } from "../model";
 import type { HUDNativePointer } from "../scene/useHUDInteraction";
@@ -69,7 +68,6 @@ export function DockEnds({
   domExited: (event?: { relatedTarget?: EventTarget | null }) => void;
   forceOpen: () => void;
 }) {
-  const zh = useFormat().language === "zh";
   const notch = config.mode === "notch";
   // The notch becomes the card: its ends wait in its row till it is back.
   const hidden = dragging || retracted || (notch && cardVisible);
@@ -133,7 +131,6 @@ export function DockEnds({
                 setHovered(side);
                 forceOpen();
               }}
-              zh={zh}
             />
           ))}
       </AnimatePresence>

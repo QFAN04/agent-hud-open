@@ -17,9 +17,9 @@ pub(crate) fn owned_by_user(path: &Path, _metadata: &fs::Metadata) -> bool {
 }
 
 /// A client's transcript this user may read: owned by this user, or by the
-/// owner Windows gives what this user's elevated programs create (the
-/// Administrators group), as an elevated Claude Code's transcripts are. Only
-/// reads of transcripts accept that; the app's own folders never do.
+/// owner Windows gives this process's files (for an elevated administrator,
+/// the Administrators group), as an elevated Claude Code's transcripts are.
+/// Only transcript reads accept that; the app's own folders never do.
 pub(crate) fn user_transcript(path: &Path, metadata: &fs::Metadata) -> bool {
     owned_by_user(path, metadata) || acl::owned_by_default_owner(path)
 }
@@ -134,21 +134,49 @@ pub(crate) fn hook_text(
 
 #[cfg(test)]
 mod tests {
-    use super::{acl, complete_json, hook_text, owned_by_user, user_transcript};
+    use super::{complete_json, hook_text, user_transcript};
     use std::path::Path;
 
-    /// A file this process writes is owned by the user, or, when elevated, by
-    /// the Administrators group: a transcript read accepts both, the app's own
-    /// ownership check only the user.
+    /// What this process writes is owned by the user, or for an elevated
+    /// process by the Administrators group; a transcript read accepts both.
     #[test]
-    fn a_transcript_this_process_writes_is_readable_whether_or_not_it_is_elevated() {
+    fn a_transcript_this_process_writes_is_readable_elevated_or_not() {
         let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("session.jsonl");
+        let path = temp.path().join("t.jsonl");
         std::fs::write(&path, b"{}\n").unwrap();
         let metadata = std::fs::metadata(&path).unwrap();
         assert!(user_transcript(&path, &metadata));
-        assert!(owned_by_user(&path, &metadata) || acl::owned_by_default_owner(&path));
         assert!(!user_transcript(&temp.path().join("missing"), &metadata));
+    }
+
+    /// An elevated process's own folders belong to the Administrators group
+    /// (as a channel an elevated run left behind does): such a channel is
+    /// moved aside and made again, owned by the user. Run without elevation,
+    /// the folder is the user's own and stays where it is.
+    #[test]
+    fn a_channel_another_owner_made_is_moved_aside_and_made_again() {
+        let temp = tempfile::tempdir().unwrap();
+        let channel = temp.path().join("deepseek-channel");
+        std::fs::create_dir(&channel).unwrap();
+        std::fs::write(channel.join("old.json"), b"{}").unwrap();
+        let foreign = !super::owned_by_user(&channel, &std::fs::metadata(&channel).unwrap());
+        crate::os::channel_directory(&channel).unwrap();
+        assert!(super::owned_by_user(
+            &channel,
+            &std::fs::metadata(&channel).unwrap()
+        ));
+        let aside = std::fs::read_dir(temp.path())
+            .unwrap()
+            .flatten()
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".other-owner-")
+            })
+            .count();
+        assert_eq!(aside, usize::from(foreign));
+        assert_eq!(channel.join("old.json").exists(), !foreign);
     }
 
     #[test]

@@ -3,12 +3,18 @@
 
 #[path = "windows_hotkey.rs"]
 mod hotkey;
+#[path = "windows/session.rs"]
+mod session;
+
+pub(crate) fn prepare(app: &tauri::AppHandle) -> Result<(), String> {
+    session::install(app)
+}
 
 pub(crate) fn install(app: &tauri::AppHandle) {
     hotkey::install(app);
 }
 
-pub(crate) fn window_opened(_app: &tauri::AppHandle) {}
+pub(crate) fn window_opened(_window: &tauri::WebviewWindow) {}
 
 pub(crate) fn windows_changed(_app: &tauri::AppHandle) {}
 
@@ -23,9 +29,15 @@ pub(crate) fn statistics_chrome<'a>(
     builder
 }
 
-pub(crate) fn system_prefers_chinese() -> bool {
-    // The primary language is the low ten bits; 0x04 is Chinese.
-    unsafe { windows::Win32::Globalization::GetUserDefaultUILanguage() & 0x3ff == 0x04 }
+pub(crate) fn system_languages() -> Vec<String> {
+    use windows::Win32::Globalization::{GetUserDefaultUILanguage, LCIDToLocaleName};
+    // The UI language's name, such as "zh-TW" or "ja-JP".
+    let mut name = [0u16; 85];
+    let length = unsafe { LCIDToLocaleName(GetUserDefaultUILanguage() as u32, Some(&mut name), 0) };
+    if length <= 1 {
+        return Vec::new();
+    }
+    vec![String::from_utf16_lossy(&name[..length as usize - 1])]
 }
 
 /// A message box from a process that has not started Tauri yet.

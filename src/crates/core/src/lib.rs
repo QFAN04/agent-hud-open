@@ -1,6 +1,7 @@
 //! Portable domain engine. No Tauri, Swift, system frameworks or process execution.
 //! Source directories and operating-system actions are supplied by the platform boundary.
 //! Files are streamed and cached by offset; incomplete trailing records are retried.
+use crate::l10n::tr;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -24,6 +25,7 @@ mod database;
 pub mod demo;
 mod discovery;
 mod dispatch;
+mod guide;
 mod hook_events;
 mod host;
 mod ingestion;
@@ -169,7 +171,7 @@ impl AgentHudCore {
             .ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or(Value::Null);
-        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{}});
+        let mut settings = json!({"quotaDisplay":"consumed","codexHomes":[],"claudeHomes":[],"antigravityCliSettings":[],"appearance":"system","appearanceFollowsScreen":false,"language":"system","clientHooks":false,"optInApprovals":[],"readCopilotQuota":false,"approvalWaitMinutes":10,"launchAtLogin":true,"animations":true,"hudVisible":true,"showMenuBarIcon":true,"hudTools":false,"claudeAnswers":true,"agentMessages":false,"agentMessagesAsUser":false,"agentMessagesLimit":10,"claudeMessages":true,"deepseekMessages":true,"relayReading":[],"customPrices":{},"relayMultipliers":{},"localKinds":{},"guide":null});
         if let Some(values) = stored["settings"].as_object() {
             for (key, value) in values {
                 if settings.get(key).is_some() {
@@ -177,9 +179,12 @@ impl AgentHudCore {
                 }
             }
         }
+        if !guide::valid(&settings["guide"]) {
+            settings["guide"] = guide::unseen(stored.is_null());
+        }
         let enabled = serde_json::from_value(stored["providers"].clone()).unwrap_or_default();
         let opened = database::open(&app_data);
-        let (database, logs, session_map, last_synced_at_ms, storage_issue) = match opened {
+        let (database, mut logs, session_map, last_synced_at_ms, storage_issue) = match opened {
             Ok((database, logs, session_map, last_synced_at_ms)) => {
                 (Some(database), logs, session_map, last_synced_at_ms, None)
             }
@@ -188,16 +193,21 @@ impl AgentHudCore {
                 HashMap::new(),
                 HashMap::new(),
                 0,
-                Some(format!(
-                    "{}{error}",
-                    l10n::text("会话解析进度无法保存：", "Checkpoint storage unavailable: ")
+                Some(tr!(
+                    "Checkpoint storage unavailable: {{error}}",
+                    error = error
                 )),
             ),
         };
         let recorded = database.as_ref().and_then(data_version::recorded);
+        // Logs whose calls the ledger lost are read again, as a run of its own.
+        let lost = database.as_ref().map_or(0, |db| {
+            data_version::mark_lost_calls(db, &mut logs).unwrap_or(0)
+        });
         let indexing_run = database
             .as_ref()
-            .and_then(|_| data_version::run_at_launch(recorded.as_deref(), &logs));
+            .and_then(|_| data_version::run_at_launch(recorded.as_deref(), &logs))
+            .or((lost > 0).then_some(data_version::Run::Again));
         let requests = requests::Requests::default();
         requests.set_hold_ms(
             settings["approvalWaitMinutes"]

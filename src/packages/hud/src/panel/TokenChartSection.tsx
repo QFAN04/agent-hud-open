@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
-  animate,
   motion,
-  useMotionValue,
   useReducedMotionConfig,
-  useTransform,
   type Transition,
 } from "motion/react";
 import type {
@@ -17,13 +14,14 @@ import { Button } from "@agent-hud/ui/components/button";
 import { HUD_METRICS, sourcesForMark } from "../model";
 import { usePanelQuery } from "../PanelContext";
 import { palette, tabular, type Logo, type Period } from "./theme";
-import { useFormat } from "@agent-hud/ui/format-context";
-import { systemTimeZone, tokensShort } from "@agent-hud/ui/format";
+import { useT } from "@agent-hud/ui/format-context";
+import { systemTimeZone } from "@agent-hud/ui/format";
 import { hexAlpha } from "../tokens";
 import { useGround } from "../ground";
 import { orderedModels, visibleModelCounts } from "./model-visibility";
 import { ColumnDetail } from "./ColumnDetail";
 import { TokenBar } from "./TokenBar";
+import { TokenCount } from "./TokenCount";
 
 const moving: Transition = {
   duration: HUD_METRICS.duration,
@@ -48,7 +46,7 @@ export function SourceTokenChart({
   /** No line above it: it heads a column of its own. */
   bare?: boolean;
 }) {
-  const zh = useFormat().language === "zh";
+  const t = useT();
   const initial =
     layout.period === "week" ? "7d" : layout.period === "month" ? "30d" : "24h";
   const [period, setPeriod] = useState<Period>(initial);
@@ -155,6 +153,8 @@ export function SourceTokenChart({
         display: "grid",
         // As wide as its place, never wider: a long total shortens instead.
         gridTemplateColumns: "minmax(0, 1fr)",
+        // In a card taller than it needs, the chart takes the room left.
+        gridTemplateRows: "auto 1fr",
         gap: 6,
         paddingTop: bare ? 0 : 8,
         boxShadow: bare ? undefined : `inset 0 1px 0 ${colors.divider}`,
@@ -169,7 +169,7 @@ export function SourceTokenChart({
         }}
       >
         <strong style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>
-          {zh ? "Token 消耗" : "Tokens"}
+          {t("Tokens")}
         </strong>
         <span style={{ flex: 1 }} />
         <div style={{ display: "flex", gap: 2 }}>
@@ -184,12 +184,10 @@ export function SourceTokenChart({
                 disabled={!available}
                 title={
                   available
-                    ? zh
-                      ? `最近 ${p.label}`
-                      : `Last ${p.label}`
-                    : zh
-                      ? `这份快照没有 ${p.label} 的历史`
-                      : `${p.label} history is not provided by this snapshot`
+                    ? t("Last {{period}}", { period: p.label })
+                    : t("{{period}} history is not provided by this snapshot", {
+                        period: p.label,
+                      })
                 }
                 onClick={() => setPeriod(p.label)}
                 style={{
@@ -221,14 +219,14 @@ export function SourceTokenChart({
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}
-          title={
-            notice ??
-            (zh
-              ? "本机账本记录的用量"
-              : "Recorded usage from the shared ledger")
-          }
+          title={notice ?? t("Recorded usage from the shared ledger")}
         >
-          {period} · {known ? <TokenCount tokens={total} still={still} /> : "—"}{" "}
+          {period} ·{" "}
+          {known ? (
+            <TokenCount tokens={total} still={still} moving={moving} />
+          ) : (
+            "—"
+          )}{" "}
           tok
         </span>
       </div>
@@ -237,7 +235,7 @@ export function SourceTokenChart({
         className="hud-source-token-histogram"
         style={{
           position: "relative",
-          height: 40,
+          minHeight: 40,
           margin: "8px 6px 0",
           boxShadow: `inset 0 -1px 0 ${colors.divider}`,
           display: "flex",
@@ -307,12 +305,8 @@ export function SourceTokenChart({
                     : layout.hiddenModels?.length &&
                         (query.data?.totals.selectedTokens ?? 0) > 0 &&
                         total === 0
-                      ? zh
-                        ? "这段时间的模型消耗已隐藏"
-                        : "Model usage in this range is hidden"
-                      : zh
-                        ? "这段时间没有 token 消耗"
-                        : "No token usage in this range"}
+                      ? t("Model usage in this range is hidden")
+                      : t("No token usage in this range")}
                 </motion.span>
               )}
         </AnimatePresence>
@@ -325,26 +319,10 @@ export function SourceTokenChart({
             bucketMs={bucketMs}
             models={models}
             light={light}
-            zh={zh}
             Logo={Logo}
           />
         )}
       </div>
     </section>
   );
-}
-
-/** The range's total, counting to each new value as the bars move. */
-function TokenCount({ tokens, still }: { tokens: number; still: boolean }) {
-  const count = useMotionValue(tokens);
-  const text = useTransform(count, (value) => tokensShort(Math.round(value)));
-  useEffect(() => {
-    if (still) {
-      count.jump(tokens);
-      return;
-    }
-    const controls = animate(count, tokens, moving);
-    return () => controls.stop();
-  }, [count, tokens, still]);
-  return still ? tokensShort(tokens) : <motion.span>{text}</motion.span>;
 }

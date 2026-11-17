@@ -88,8 +88,31 @@ pub(crate) fn engine_executable(path: &Path) -> bool {
     super::unix::executable(path)
 }
 pub(crate) fn configure_command(_command: &mut Command) {}
+pub(crate) fn spawn(command: &mut Command) -> std::io::Result<std::process::Child> {
+    command.spawn()
+}
 pub(crate) fn engine_candidates(home: &Path, env: &Environment, name: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
+    // WorkBuddy's key is read only by the WorkBuddy app itself, never by
+    // whatever else on PATH carries the name.
+    if name == "workbuddy-app" {
+        let mut apps: Vec<PathBuf> = [PathBuf::from("/Applications"), home.join("Applications")]
+            .into_iter()
+            .map(|root| root.join("WorkBuddy.app"))
+            .collect();
+        if !apps.iter().any(|app| app.is_dir()) {
+            apps.extend(registered_applications("com.tencent.workbuddy.mac"));
+        }
+        for app in apps {
+            let plist =
+                std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
+            if !plist.contains("com.workbuddy.workbuddy-ai") {
+                paths.push(app.join("Contents/MacOS/Electron"));
+                paths.push(app.join("Contents/MacOS/WorkBuddy"));
+            }
+        }
+        return paths;
+    }
     if name == "codex" {
         let engines = |app: PathBuf| {
             [

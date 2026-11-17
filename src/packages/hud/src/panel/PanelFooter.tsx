@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@agent-hud/ui/components/button";
-import type { Language } from "@agent-hud/ui/format";
+import { translator, type Language } from "@agent-hud/ui/format";
 import type { HUDUpdateNotice } from "../model";
 import type { palette } from "./theme";
 
@@ -15,6 +15,7 @@ import type { palette } from "./theme";
 export function PanelFooter({
   language,
   colors,
+  lined,
   onConfigure,
   onStats,
   update,
@@ -22,11 +23,14 @@ export function PanelFooter({
 }: {
   language: Language;
   colors: ReturnType<typeof palette>;
+  /** A line above it, where the panel draws lines and not cards. */
+  lined: boolean;
   onConfigure?: () => void;
   onStats?: () => void;
   update?: HUDUpdateNotice | null;
   onUpdate?: () => void;
 }) {
+  const t = translator(language);
   const footerButton = (color: string): CSSProperties => ({
     width: 28,
     height: 28,
@@ -45,16 +49,16 @@ export function PanelFooter({
         justifyContent: "space-between",
         alignItems: "center",
         flex: "0 0 auto",
-        paddingTop: 6,
-        boxShadow: `inset 0 1px 0 ${colors.divider}`,
+        paddingTop: lined ? 6 : 0,
+        boxShadow: lined ? `inset 0 1px 0 ${colors.divider}` : undefined,
         color: colors.secondary,
       }}
     >
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label={language === "zh" ? "设置" : "Settings"}
-        title={language === "zh" ? "设置" : "Settings"}
+        aria-label={t("Settings")}
+        title={t("Settings")}
         disabled={!onConfigure}
         onClick={onConfigure}
         style={footerButton(colors.secondary)}
@@ -75,14 +79,8 @@ export function PanelFooter({
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={
-                language === "zh" ? "发现新版本" : "New version available"
-              }
-              title={
-                language === "zh"
-                  ? `更新至 ${update.version}`
-                  : `Update to ${update.version}`
-              }
+              aria-label={t("New version available")}
+              title={t("Update to {{version}}", { version: update.version })}
               disabled={!onUpdate}
               onClick={onUpdate}
               style={footerButton(colors.accent)}
@@ -97,8 +95,8 @@ export function PanelFooter({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={language === "zh" ? "用量统计" : "Usage statistics"}
-          title={language === "zh" ? "用量统计" : "Usage statistics"}
+          aria-label={t("Usage statistics")}
+          title={t("Usage statistics")}
           disabled={!onStats}
           onClick={onStats}
           style={footerButton(colors.secondary)}
