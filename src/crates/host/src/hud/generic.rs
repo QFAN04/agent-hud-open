@@ -104,6 +104,10 @@ pub(super) fn end_text_focus(
     Ok(())
 }
 
+pub(super) fn is_text_focus_active(window: &tauri::WebviewWindow) -> bool {
+    window.is_focused().unwrap_or(true)
+}
+
 pub(super) fn set_drag_cursor(app: &tauri::AppHandle, owner: &Shared, active: bool) {
     if let Some(window) = app.get_webview_window(&owner.label) {
         let _ = window.set_cursor_icon(if active {

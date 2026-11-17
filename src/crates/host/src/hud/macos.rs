@@ -22,7 +22,9 @@ mod displays;
 #[path = "macos/text_focus.rs"]
 mod text_focus;
 pub(super) use displays::{measure_screens, screen};
-pub(super) use text_focus::{begin_text_focus, end_text_focus, TextFocusOrigin};
+pub(super) use text_focus::{
+    begin_text_focus, end_text_focus, is_text_focus_active, TextFocusOrigin,
+};
 
 /// NSEvent reports the pointer in one global point plane across displays.
 pub(super) const GLOBAL_POINTS: bool = true;

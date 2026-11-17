@@ -116,6 +116,19 @@ impl MessageSession {
             .send(&self.endpoint, "SendUserCascadeMessage", params)
             .map_err(|_| MessageError::Uncertain)
     }
+
+    /// Interrupts the conversation on the verified service that opened it. An
+    /// error after the request starts is uncertain and is never retried.
+    pub fn interrupt(&self) -> Result<Value, MessageError> {
+        service()
+            .map_err(MessageError::Unavailable)?
+            .send(
+                &self.endpoint,
+                "CancelCascadeInvocation",
+                &json!({ "cascadeId": self.cascade_id }),
+            )
+            .map_err(|_| MessageError::Uncertain)
+    }
 }
 
 #[cfg(test)]

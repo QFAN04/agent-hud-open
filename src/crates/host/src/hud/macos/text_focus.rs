@@ -123,3 +123,7 @@ pub(in crate::hud) fn end_text_focus(
         Ok(())
     })
 }
+
+pub(in crate::hud) fn is_text_focus_active(window: &tauri::WebviewWindow) -> bool {
+    window.is_focused().unwrap_or(true)
+}

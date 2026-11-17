@@ -43,7 +43,7 @@ const patterns = {
 };
 const unescape = (text) => JSON.parse(`"${text}"`);
 const isTest = (path) =>
-  /(^|\/)(tests?|fixtures)\/|_tests?(_\w+)?\.rs$|\/tests\.rs$|\.test\.tsx?$/.test(
+  /(^|[/\\])(tests?|fixtures)[/\\]|_tests?(_\w+)?\.rs$|[/\\]tests\.rs$|\.test\.tsx?$/.test(
     path,
   );
 

@@ -3,29 +3,55 @@
 //! the record that undoes it, and the plan for that file.
 use super::super::{install, InstallContext};
 use super::{configuration, conflict, FileChange, FLAG, METADATA};
+use agent_hud_agents::Os;
 use serde_json::{json, Value};
 use std::path::Path;
+
+mod windows;
+
+struct Callback {
+    display: String,
+    executable: String,
+    data: String,
+    settings: String,
+}
 
 fn quote(text: &str) -> String {
     format!("'{}'", text.replace('\'', "'\\''"))
 }
 
-fn callback(context: &InstallContext, data: &Path, settings: &Path) -> Result<String, String> {
-    let path = |path: &Path| {
-        path.to_str()
+fn callback(context: &InstallContext, data: &Path, settings: &Path) -> Result<Callback, String> {
+    let path = |path: &Path| -> Result<String, String> {
+        let text = path
+            .to_str()
             .filter(|text| !text.contains('\0'))
-            .map(quote)
-            .ok_or_else(|| "The callback path is not valid UTF-8".to_owned())
+            .ok_or_else(|| "The callback path is not valid UTF-8".to_owned())?;
+        if matches!(crate::os::OS, Os::Windows) {
+            windows::validate_path(text)?;
+        }
+        Ok(text.to_owned())
     };
     if !data.is_absolute() {
         return Err("The callback data directory must be absolute".into());
     }
-    Ok(format!(
-        "{} {FLAG} {} {}",
-        path(&context.executable)?,
-        path(data)?,
-        path(settings)?
-    ))
+    let executable = path(&context.executable)?;
+    let data = path(data)?;
+    let settings = path(settings)?;
+    let display = match crate::os::OS {
+        Os::Windows => windows::callback_display(&executable, FLAG, &data, &settings),
+        Os::MacOs | Os::Linux => format!(
+            "{} {FLAG} {} {}",
+            quote(&executable),
+            quote(&data),
+            quote(&settings)
+        ),
+    };
+    Ok(Callback {
+        display,
+        executable,
+        data,
+        settings,
+    })
 }
 
 fn original_renderer(value: &Value) -> Result<&str, String> {
@@ -38,7 +64,34 @@ fn original_renderer(value: &Value) -> Result<&str, String> {
         .ok_or_else(|| "The existing CLI statusLine command is unavailable".into())
 }
 
-fn installed_line(original: Option<&Value>, callback: &str) -> Result<Value, String> {
+fn wrapped_command(callback: &Callback, renderer: Option<&str>) -> Result<String, String> {
+    match crate::os::OS {
+        Os::Windows => windows::command(
+            &callback.executable,
+            FLAG,
+            &callback.data,
+            &callback.settings,
+            renderer,
+        ),
+        Os::MacOs | Os::Linux => match renderer {
+            Some(renderer) => Ok(format!(
+                "agent_hud_input=$(cat; printf '.'); agent_hud_input=${{agent_hud_input%.}}; printf '%s' \"$agent_hud_input\" | {} >/dev/null 2>&1; printf '%s' \"$agent_hud_input\" | /bin/sh -c {}",
+                callback.display,
+                quote(renderer),
+            )),
+            None => Ok(format!("{} >/dev/null 2>&1 || :", callback.display)),
+        },
+    }
+}
+
+fn contains_flag(command: &str) -> bool {
+    match crate::os::OS {
+        Os::Windows => windows::contains_flag(command, FLAG),
+        Os::MacOs | Os::Linux => command.contains(FLAG),
+    }
+}
+
+fn installed_line(original: Option<&Value>, callback: &Callback) -> Result<Value, String> {
     match original {
         Some(original) if original.is_object() && original["enabled"] == false => {
             // Connecting enables collection, not a previously disabled renderer.
@@ -47,7 +100,7 @@ fn installed_line(original: Option<&Value>, callback: &str) -> Result<Value, Str
             let mut installed = original.clone();
             installed["enabled"] = json!(true);
             installed["type"] = json!("command");
-            installed["command"] = json!(format!("{callback} >/dev/null 2>&1 || :"));
+            installed["command"] = json!(wrapped_command(callback, None)?);
             installed["stack_with_default"] = json!(true);
             Ok(installed)
         }
@@ -55,17 +108,16 @@ fn installed_line(original: Option<&Value>, callback: &str) -> Result<Value, Str
             let renderer = original_renderer(original)?;
             // A sentinel preserves trailing newlines through POSIX command
             // substitution. The payload stays in memory; no private stdin file.
-            let command = format!(
-                "agent_hud_input=$(cat; printf '.'); agent_hud_input=${{agent_hud_input%.}}; printf '%s' \"$agent_hud_input\" | {callback} >/dev/null 2>&1; printf '%s' \"$agent_hud_input\" | /bin/sh -c {}",
-                quote(renderer),
-            );
+            let command = wrapped_command(callback, Some(renderer))?;
             let mut installed = original.clone();
             installed["command"] = json!(command);
             Ok(installed)
         }
-        None => Ok(
-            json!({"type":"command","command":format!("{callback} >/dev/null 2>&1 || :"),"stack_with_default":true}),
-        ),
+        None => Ok(json!({
+            "type": "command",
+            "command": wrapped_command(callback, None)?,
+            "stack_with_default": true,
+        })),
     }
 }
 
@@ -98,7 +150,7 @@ pub(super) fn plan_file(
         let created = owned["createdSettings"].as_bool().ok_or_else(conflict)?;
         let previous = had.then(|| &owned["originalStatusLine"]);
         let installed = installed_line(previous, &command).map_err(|_| conflict())?;
-        if *owned != metadata(previous, &installed, &command, created)
+        if *owned != metadata(previous, &installed, &command.display, created)
             || current.get("statusLine") != Some(&installed)
         {
             return Err(conflict());
@@ -115,17 +167,13 @@ pub(super) fn plan_file(
         remove_file = created && updated.is_empty();
     } else if enabled {
         let previous = current.get("statusLine");
-        if previous.is_some_and(|line| {
-            line["command"]
-                .as_str()
-                .is_some_and(|command| command.contains(FLAG))
-        }) {
+        if previous.is_some_and(|line| line["command"].as_str().is_some_and(contains_flag)) {
             return Err(conflict());
         }
         let installed = installed_line(previous, &command)?;
         updated.insert(
             METADATA.into(),
-            metadata(previous, &installed, &command, original.is_none()),
+            metadata(previous, &installed, &command.display, original.is_none()),
         );
         updated.insert("statusLine".into(), installed);
     } else {

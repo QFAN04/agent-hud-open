@@ -73,9 +73,9 @@ export function start(ctx, channel, options = {}) {
         result.then(undefined, () => {});
     } catch {}
   };
-  const every = (ms, work) => {
+  const every = (ms, work, unref = true) => {
     const timer = setInterval(() => quietly(work), ms);
-    timer.unref?.();
+    if (unref) timer.unref?.();
     timers.add(timer);
     return timer;
   };
@@ -210,11 +210,6 @@ export function start(ctx, channel, options = {}) {
       remove(file);
       if (value !== undefined) ask.settle(value);
     }
-    if (asks.size === 0 && answerTimer) {
-      clearInterval(answerTimer);
-      timers.delete(answerTimer);
-      answerTimer = null;
-    }
   };
   /** Asks the HUD alongside the client's own card; the first answer wins. */
   const race = async (kind, request, next, body) => {
@@ -241,7 +236,7 @@ export function start(ctx, channel, options = {}) {
       return next();
     }
     asks.set(id, { kind, questions: (body.questions ?? []).map((q) => q.id), settle });
-    if (!answerTimer) answerTimer = every(timing.answers, pollAnswers);
+    if (!answerTimer) answerTimer = every(timing.answers, pollAnswers, false);
     const onAbort = () => settle(undefined);
     original?.addEventListener?.("abort", onAbort, { once: true });
     try {
@@ -268,6 +263,11 @@ export function start(ctx, channel, options = {}) {
     } finally {
       original?.removeEventListener?.("abort", onAbort);
       asks.delete(id);
+      if (asks.size === 0 && answerTimer) {
+        clearInterval(answerTimer);
+        timers.delete(answerTimer);
+        answerTimer = null;
+      }
       remove(file);
       remove(folder("asks", `${id}.answer`));
     }

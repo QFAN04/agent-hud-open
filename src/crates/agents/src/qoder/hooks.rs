@@ -3,9 +3,9 @@
 //! runs Agent HUD's rewake hook, which hands a waiting message to an idle
 //! session.
 use crate::hooks::{
-    stop, Began, Begin, Completed, Completion, Hooks, Layout, Permission, Reply, Rewake, POSIX_ONLY,
+    stop, Began, Begin, Completed, Completion, Hooks, Launch, Layout, Permission, Reply, Rewake,
 };
-use crate::{text, Location};
+use crate::{text, Location, PerOs, Support};
 use serde_json::Value;
 
 const PERMISSION: Permission = Permission {
@@ -63,6 +63,12 @@ fn background(arguments: &[String], env: &dyn Fn(&str) -> Option<String>) -> boo
     !printing && !ci
 }
 
+const LAUNCH: PerOs<Launch> = PerOs {
+    macos: Support::Verified(Launch::Command),
+    linux: Support::Verified(Launch::Command),
+    windows: Support::Unverified(Launch::CommandArgs),
+};
+
 pub static QODER: Hooks = Hooks {
     settings: Some(Location::home(
         &["QODER_CONFIG_DIR"],
@@ -79,7 +85,7 @@ pub static QODER: Hooks = Hooks {
     compaction: None,
     rewake: Some(REWAKE),
     prefixed_sessions: false,
-    launch: POSIX_ONLY,
+    launch: LAUNCH,
 };
 
 pub static QODER_CN: Hooks = Hooks {
@@ -98,7 +104,7 @@ pub static QODER_CN: Hooks = Hooks {
     compaction: None,
     rewake: Some(REWAKE),
     prefixed_sessions: false,
-    launch: POSIX_ONLY,
+    launch: LAUNCH,
 };
 
 pub static QODER_WORK: Hooks = Hooks {
@@ -114,7 +120,7 @@ pub static QODER_WORK: Hooks = Hooks {
     // Not checked in QoderWork's desktop app, which may wait for the hook.
     rewake: None,
     prefixed_sessions: false,
-    launch: POSIX_ONLY,
+    launch: LAUNCH,
 };
 
 fn began(payload: &Value) -> Option<Began> {

@@ -51,6 +51,7 @@ struct Failure {
     message: String,
     damaged: bool,
 }
+
 impl Failure {
     fn sql(error: rusqlite::Error) -> Self {
         Self {
@@ -61,6 +62,7 @@ impl Failure {
             message: error.to_string(),
         }
     }
+
     fn other(message: String) -> Self {
         Self {
             message,

@@ -280,6 +280,18 @@ mod tests {
     }
 
     #[test]
+    fn windows_reads_from_the_unverified_cache() {
+        let mut host = host_with(fresh_quota(false));
+        host.os = Os::Windows;
+        let reading = read(&host).unwrap();
+        assert_ne!(
+            reading.notice.as_deref(),
+            Some("Grok Bot cache acquisition is not implemented on this platform")
+        );
+        assert!(!reading.quotas.is_empty());
+    }
+
+    #[test]
     fn stale_or_linked_caches_are_refused() {
         let mut quota = fresh_quota(false);
         quota["expiresAtMs"] = json!(1);

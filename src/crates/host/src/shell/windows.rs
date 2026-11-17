@@ -1,6 +1,8 @@
-//! Windows: the app keeps its taskbar entry, and the global shortcut is not
-//! implemented yet (macOS uses ⌘⌥H to show Settings; the tray menu does here).
+//! Windows: the app keeps its taskbar entry, and Ctrl+Alt+H toggles the HUD
+//! notch glow through Win32's RegisterHotKey.
 
+#[path = "windows_hotkey.rs"]
+mod hotkey;
 #[path = "windows/session.rs"]
 mod session;
 
@@ -8,7 +10,9 @@ pub(crate) fn prepare(app: &tauri::AppHandle) -> Result<(), String> {
     session::install(app)
 }
 
-pub(crate) fn install(_app: &tauri::AppHandle) {}
+pub(crate) fn install(app: &tauri::AppHandle) {
+    hotkey::install(app);
+}
 
 pub(crate) fn window_opened(_window: &tauri::WebviewWindow) {}
 

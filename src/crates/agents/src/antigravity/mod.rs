@@ -22,9 +22,7 @@ pub static LOCAL_SERVICE: Channel = Channel {
     carries: &[Carries::Requests, Carries::Quota],
     support: PerOs {
         macos: Support::Verified(()),
-        windows: Support::Unsupported(
-            "Antigravity local-service discovery is not implemented on Windows",
-        ),
+        windows: Support::Unverified(()),
         linux: Support::Unverified(()),
     },
 };

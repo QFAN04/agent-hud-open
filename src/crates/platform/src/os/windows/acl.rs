@@ -38,15 +38,6 @@ impl Drop for Local {
         }
     }
 }
-pub(super) fn sid() -> Result<String, String> {
-    token_sid(TokenUser)
-}
-/// The owner Windows gives what this process creates: the user, or for an
-/// elevated administrator the Administrators group.
-fn default_owner() -> Option<&'static str> {
-    static OWNER: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
-    OWNER.get_or_init(|| token_sid(TokenOwner).ok()).as_deref()
-}
 /// One SID from this process's token (`TokenUser` or `TokenOwner`), as text.
 fn token_sid(class: i32) -> Result<String, String> {
     unsafe {
@@ -81,6 +72,15 @@ fn token_sid(class: i32) -> Result<String, String> {
             count,
         )))
     }
+}
+pub(super) fn sid() -> Result<String, String> {
+    token_sid(TokenUser)
+}
+/// The owner Windows gives what this process creates: the user, or for an
+/// elevated administrator the Administrators group.
+fn default_owner() -> Option<&'static str> {
+    static OWNER: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    OWNER.get_or_init(|| token_sid(TokenOwner).ok()).as_deref()
 }
 pub(super) fn security(inherit: bool) -> Result<Local, String> {
     let sid = sid()?;

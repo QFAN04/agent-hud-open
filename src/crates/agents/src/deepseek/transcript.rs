@@ -354,4 +354,17 @@ mod tests {
         assert_eq!(rows[0].text.as_deref(), Some("Fix the build"));
         assert!(rows[0].is_prompt);
     }
+
+    #[test]
+    fn deepseek_account_provider_routes_under_deepseek_official() {
+        let mut log = Log::new("session.v4.jsonl".into(), "deepseek");
+        log.parse(
+            &json!({"type":"session","version":4,"id":"d1","createdAt":"2026-10-23T07:59:00Z"}),
+        );
+        log.parse(&json!({"type":"request/context","time":"2026-10-23T08:00:00Z","seq":1,"data":{"model":"deepseek-chat","provider":"deepseek-account"}}));
+        log.parse(&json!({"type":"assistant/message","time":"2026-10-23T08:00:02Z","seq":2,"data":{"turn":1,"step":1,"usage":{"inputTokens":100,"outputTokens":200}}}));
+        let event = log.meter_events.values().next().unwrap();
+        assert_eq!(event.model, "deepseek-chat#deepseek-official");
+        assert_eq!(route("openrouter"), "openrouter");
+    }
 }

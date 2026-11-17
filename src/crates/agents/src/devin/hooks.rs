@@ -2,7 +2,7 @@
 //! completed turns, and where a session runs. Its questions and plans stay
 //! with the client. Devin Desktop's Devin Local is the same CLI, reading the
 //! same settings file, so these hooks cover both.
-use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY};
+use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, QUOTED_COMMAND};
 use crate::process::Imported;
 use crate::Location;
 use serde_json::Value;
@@ -37,7 +37,7 @@ pub static HOOKS: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: POSIX_ONLY,
+    launch: QUOTED_COMMAND,
 };
 
 /// Devin runs Claude Code's hooks too, from its default import of Claude

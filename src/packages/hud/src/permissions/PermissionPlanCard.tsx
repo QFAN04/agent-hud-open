@@ -65,9 +65,11 @@ export function PermissionPlanCard({
       {(request.plan || request.detail || request.input) && (
         <div
           aria-label={t("Plan text")}
+          className="hud-windows-scroll"
           style={{
             maxHeight: 150,
             overflowY: "auto",
+            scrollbarWidth: "thin",
             padding: 9,
             borderRadius: 7,
             background: inset,

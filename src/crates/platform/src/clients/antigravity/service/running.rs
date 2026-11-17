@@ -3,8 +3,15 @@ pub(super) struct Server {
     pub pid: u32,
     pub token: String,
     pub extension: Option<(u16, String)>,
-    priority: u8,
+    pub(super) priority: u8,
 }
+
+#[cfg(windows)]
+#[path = "running/daemon_windows.rs"]
+mod daemon;
+#[cfg(not(windows))]
+#[path = "running/daemon_unix.rs"]
+mod daemon;
 fn flag(command: &str, name: &str) -> Option<String> {
     let target = format!("--{name}");
     let mut offset = 0;
@@ -33,7 +40,21 @@ fn flag(command: &str, name: &str) -> Option<String> {
 }
 
 pub(super) fn servers() -> Result<Vec<Server>, String> {
+    let daemon_servers = daemon::servers();
+    if !daemon_servers.is_empty() {
+        return Ok(daemon_servers);
+    }
     Ok(parse_servers(crate::os::processes()?))
+}
+
+pub(super) fn is_server_executable(normalized: &str) -> bool {
+    (normalized.contains("language_server") || normalized.contains("language-server"))
+        && (normalized.contains("antigravity.app/")
+            || normalized.contains("antigravity ide.app/")
+            || normalized.contains("/antigravity/")
+            || normalized.contains("/antigravity ide/")
+            || normalized.contains("/antigravity-cli/")
+            || normalized.contains("/antigravity_cli/"))
 }
 
 fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
@@ -43,14 +64,9 @@ fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
         let command = process.command.as_str();
         let executable = process.executable.to_lowercase().replace('\\', "/");
         let cli = matches!(executable.rsplit('/').next(), Some("agy" | "agy.exe"));
-        let server = (executable.contains("language_server")
-            || executable.contains("language-server"))
-            && (executable.contains("antigravity.app/")
-                || executable.contains("antigravity ide.app/")
-                || executable.contains("/antigravity/")
-                || executable.contains("/antigravity-cli/")
-                || executable.contains("/antigravity_cli/")
-                || flag(command, "app_data_dir")
+        let server = is_server_executable(&executable)
+            || ((executable.contains("language_server") || executable.contains("language-server"))
+                && flag(command, "app_data_dir")
                     .is_some_and(|path| path.starts_with("antigravity")));
         if !server && !cli {
             continue;

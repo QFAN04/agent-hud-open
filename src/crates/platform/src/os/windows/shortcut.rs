@@ -101,7 +101,8 @@ fn unicode(bytes: &[u8], at: usize) -> Option<String> {
         .as_chunks::<2>()
         .0
         .iter()
-        .map(|pair| u16::from_le_bytes(*pair))
+        .copied()
+        .map(u16::from_le_bytes)
         .take_while(|unit| *unit != 0)
         .collect();
     String::from_utf16(&units).ok()

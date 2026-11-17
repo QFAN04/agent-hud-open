@@ -6,10 +6,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // The plugin as Harness loads it: agent-hud.mjs with agent-hud-inbox.mjs
 // after it, as `SCRIPT` in mod.rs joins them.
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = path.dirname(fileURLToPath(import.meta.url));
 const joined = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-plugin-module-"));
 fs.writeFileSync(
   path.join(joined, "agent-hud.mjs"),
@@ -17,7 +18,9 @@ fs.writeFileSync(
     .map((name) => fs.readFileSync(path.join(here, name), "utf8"))
     .join(""),
 );
-const { start, apply } = await import(path.join(joined, "agent-hud.mjs"));
+const { start, apply } = await import(
+  pathToFileURL(path.join(joined, "agent-hud.mjs")).href
+);
 test.after(() => fs.rmSync(joined, { recursive: true, force: true }));
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

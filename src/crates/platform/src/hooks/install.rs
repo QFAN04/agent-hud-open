@@ -4,6 +4,16 @@ use std::{collections::HashMap, path::PathBuf};
 
 mod files;
 
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as host;
+
+#[cfg(not(windows))]
+mod unix;
+#[cfg(not(windows))]
+use unix as host;
+
 pub(super) use files::contents;
 pub(crate) use files::{target, write_contents};
 
@@ -40,26 +50,22 @@ impl InstallPlan {
     }
 }
 pub(super) fn canonical(context: &InstallContext) -> Result<(), String> {
-    let fixed=context.canonical_executable.as_ref().ok_or_else(|| tr!("This build has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path."))?;
-    let text = fixed.to_string_lossy();
-    if !fixed.is_absolute()
-        || text.starts_with("/Volumes/")
-        || text.contains("/AppTranslocation/")
-        || fixed.components().any(|p| p.as_os_str() == "target")
-    {
+    let fixed = context.canonical_executable.as_ref().ok_or_else(|| {
+        tr!("This build has no approved fixed hook-owner executable yet. Keep hooks disabled until an explicit migration supplies its canonical installation path.")
+    })?;
+    if host::disallowed_path(fixed) {
         return Err(tr!("Hooks cannot point at target builds, disk images or translocated copies. Use the approved fixed installed executable."));
     }
     let resolved = fixed
         .canonicalize()
         .map_err(|_| tr!("The approved fixed hook executable is unavailable"))?;
-    let physical = resolved.to_string_lossy();
-    if physical.starts_with("/Volumes/")
-        || physical.contains("/AppTranslocation/")
-        || resolved.components().any(|p| p.as_os_str() == "target")
-    {
+    if host::disallowed_path(&resolved) {
         return Err(tr!("The fixed hook path resolves to a transient target build; client settings were not changed."));
     }
-    if context.executable != *fixed || !fixed.is_file() {
+    if host::disallowed_path(&context.executable)
+        || !host::same_executable(&context.executable, fixed, &resolved)
+        || !fixed.is_file()
+    {
         return Err(tr!("This executable is not the approved fixed hook owner; client settings were not changed."));
     }
     Ok(())

@@ -21,7 +21,7 @@
 //! `hermes chat` starts. Its gateway never asks: it runs them once approved.
 use super::settings;
 use crate::hooks::{
-    Began, Begin, Completed, Completion, Hooks, Layout, Text, ENVIRONMENT, POSIX_ONLY,
+    Began, Begin, Completed, Completion, Hooks, Layout, Text, ENVIRONMENT, QUOTED_COMMAND,
 };
 use crate::{text, Location, Profiles};
 use serde_json::Value;
@@ -63,7 +63,7 @@ pub static HOOKS: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: POSIX_ONLY,
+    launch: QUOTED_COMMAND,
 };
 
 /// The session a payload names, as Agent HUD's Hermes reader names it from

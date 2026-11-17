@@ -1,6 +1,6 @@
 //! Qwen Code's hooks: permission requests and completed turns. It counts
 //! timeouts in milliseconds; its questions and plans stay with the client.
-use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, POSIX_ONLY};
+use crate::hooks::{stop, Completed, Completion, Hooks, Layout, Permission, Reply, QUOTED_COMMAND};
 use crate::Location;
 use serde_json::Value;
 
@@ -34,7 +34,7 @@ pub static HOOKS: Hooks = Hooks {
     compaction: None,
     rewake: None,
     prefixed_sessions: true,
-    launch: POSIX_ONLY,
+    launch: QUOTED_COMMAND,
 };
 
 /// Qwen Code's `Stop`: the turn is the callback's prompt.
